@@ -698,7 +698,8 @@ void MainWindow::sendData4MicTracker_function1(){
                                             glWidget_raycast->bufSize);
     }
     // detect cells
-    micTracker->processSingleFrameAndReturn(0);
+    micTracker->processSingleFrameAndReturn(glWidget_raycast->curr_timePoint_in_canvas,
+                                            data4test->filelist.at(glWidget_raycast->curr_timePoint_in_canvas));
 
     // display
     //// display results in canvas

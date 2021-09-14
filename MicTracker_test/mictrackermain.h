@@ -13,7 +13,7 @@ class MicTrackerMain
 {
 public:
     MicTrackerMain(void *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/);
-    void processSingleFrameAndReturn(int curr_timePoint_in_canvas);
+    void processSingleFrameAndReturn(int curr_timePoint_in_canvas,const QString &fileName);
     void cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_frame);
     void regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat,
                               Mat *idMapIn /*int*/, int seed_num,
@@ -25,19 +25,10 @@ public:
                                   segParameter p4segVol);
     // the key function to get cell territory
     void refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol);
-    // functions called in refineSeed2Region
-    void refineCellTerritoryWithSeedRegion(synQuantSimple& cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol);
-    void refineCellsTerritoriesWithSeedRegions(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol);
-    void cellShrinkTest(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol);
-    void fgGapRemoval(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol);
-    void gapBasedRegionSegment(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
-    void gapTest2SplitCellTerritory(synQuantSimple &cellSegFromSynQuant, cv::Mat* seeds_Map /*CV_32S*/, int n, singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
-    void removeOtherSeedsInfgMap(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol);
-
     void retrieve_seeds(Mat *dataVolFloat, Mat *label_map_1stRound, size_t cell_num_1stRound,
                         Mat *cellGapMap, Mat &idMap_2ndRound, int &seed_num_2ndRound);
+    bool saveSegResults(const QString &fileName);
 
-    void boundaryTouchedTest(Mat *label_map, Mat *fgMap, bool &xy_touched, bool &z_touched);
 
     Mat * extract3d(Mat *data_grayim4d,int curr_frame);
     Mat * extract2d(Mat *data_grayim3d,int curr_slice,int datatype);

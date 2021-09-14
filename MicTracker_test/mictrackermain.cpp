@@ -25,7 +25,6 @@ MicTrackerMain::MicTrackerMain(void *data_grayim4d, int _data_type, long bufSize
     data_rows_cols_slices[1] = bufSize[0];
     data_rows_cols_slices[2] = bufSize[2];
     if (bufSize[3] != 1){
-        //qFatal("Input is not a gray image\n");
         Q_ASSERT(bufSize[3] != 1);
     }
     time_points = bufSize[4];
@@ -54,65 +53,70 @@ MicTrackerMain::MicTrackerMain(void *data_grayim4d, int _data_type, long bufSize
     }else{
         qFatal("Unsupported data type\n");
     }
-    //normalize(*data4d, *data4d, 0, 255, NORM_MINMAX, CV_8U);
 
-//    Mat tmp;
-//    data4d->copyTo(tmp);
-//    qInfo("%d - %d - %d - %d \n", data4d->size[0], data4d->size[1],
-//            data4d->size[2], data4d->size[3]);
-//    normalize(tmp, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
-    //Mat normalized_data4d;
-//    normalize(*data4d, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
     data4d->copyTo(normalized_data4d);
-    //ccShowSlice3Dmat(data4d, CV_16U);
     assert(normalized_data4d.type() == CV_8U);
     delete data4d;
 }
-void MicTrackerMain::processSingleFrameAndReturn(int curr_timePoint_in_canvas){
+void MicTrackerMain::processSingleFrameAndReturn(int curr_timePoint_in_canvas,const QString &fileName){
+
+    //////////////////////////////////////////////////////////////////
+    //           1. get one frame
+    //////////////////////////////////////////////////////////////////
     long sz_single_frame = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
     curr_time_point = curr_timePoint_in_canvas;
-
     unsigned char *ind = (unsigned char*)normalized_data4d.data + sz_single_frame*curr_time_point; // sub-matrix pointer
     Mat *single_frame = new Mat(3, normalized_data4d.size, CV_8U, ind);
-
     cell_label_maps[curr_time_point] = Mat::zeros(3, normalized_data4d.size, CV_32S); // int label
     threshold_maps[curr_time_point] = Mat::zeros(3, normalized_data4d.size, CV_8U);
+
+
+    //////////////////////////////////////////////////////////////////
+    //           2. segment
+    //////////////////////////////////////////////////////////////////
     chrono::steady_clock::time_point begin = chrono::steady_clock::now();
     cellSegmentSingleFrame(single_frame, curr_time_point);
     time_points_processed[curr_time_point] = true;
     chrono::steady_clock::time_point end = chrono::steady_clock::now();
     qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
 
-    if(number_cells[curr_time_point] > 50000){
-        qDebug("!!!!!!!!!!!!!:We should not detect that many cells !");
+
+    //////////////////////////////////////////////////////////////////
+    //           3. save
+    //////////////////////////////////////////////////////////////////
+    if(!saveSegResults(fileName)){
+        qDebug("Failed to save the segmentation results to hard drive");
     }
+
     qInfo("----------------totally: %ld cells are detected", number_cells[curr_time_point]);
-    //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
     delete single_frame;
 }
 
 void MicTrackerMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_frame)
 {
-    //data_grayim3d is uint8 0-255 datatype
+    //convert data to float
     Mat *dataVolFloat = new Mat(data_grayim3d->dims, data_grayim3d->size, CV_32F);
     data_grayim3d->convertTo(*dataVolFloat, CV_32F);
-    int thres=getMaxContrast(data_grayim3d);
-//    Mat tmp = *dataVolFloat>25.5;
-//    ccShowSlice3Dmat(tmp, CV_8U,20);
-//    ccShowSlice3Dmat(data_grayim3d, CV_8U,20);
-    /******** start to do cell segmentation *******/
-//    float sigma2d[3] = {3.0, 3.0, 0.0};
-//    principalCv2d(dataVolFloat, principalCurv2d[curr_frame], sigma2d, p4segVol.min_intensity);
-    //ccShowSlice3Dmat(&principalCurv2d[curr_frame], CV_32F, 3);
+
+
+    //////////////////////////////////////////////////////////////////
+    //           1. get PC score
+    //////////////////////////////////////////////////////////////////
     float sigma3d[3] = {3.0, 3.0, 3.0};
     principalCv3d(dataVolFloat, principalCurv3d[curr_frame], sigma3d, true,p4segVol.min_intensity);
-//    Mat tmp = principalCurv3d[curr_frame]<=0;
-//    ccShowSlice3Dmat(tmp, CV_8U,20);
 
-    // synquant based on principalCurv3d
+//    for(int z=0;z<100;z++){
+//        ccShowSlice3Dmat(principalCurv3d[curr_frame],CV_32F,z);
+//    }
 
-
+    //////////////////////////////////////////////////////////////////
+    //           2. use synQuant for PC score
+    //////////////////////////////////////////////////////////////////
+    double tmp_min, tmp_max;
     Mat imgIn_temp, imgIn_temp2;
+
+    minMaxIdx(principalCurv3d[curr_frame], &tmp_min, &tmp_max);
+    max(principalCurv3d[curr_frame]/tmp_max,0,imgIn_temp);
     sqrt(imgIn_temp,imgIn_temp2);
     Mat imgPCfloat=1-imgIn_temp2;
     Mat imgPCfloat255,imgPC8U;
@@ -120,22 +124,17 @@ void MicTrackerMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fram
 
     variances[curr_frame] = calVarianceStablization(&imgPCfloat255, varMaps[curr_frame], varTrends[curr_frame],
                                                    p4odStats.varAtRatio, p4odStats.gap4varTrendEst);
-    //ccShowSlice3Dmat(dataVolFloat, CV_32F, 3);
-    ccShowSlice3Dmat(&varMaps[curr_frame], CV_32F, 3);
 
-    //////////////////////////////////////////////////////////////////
-    //           1. use synQuant for PC score
-    //////////////////////////////////////////////////////////////////
 
     imgPCfloat255.convertTo(imgPC8U, CV_8U);
     synQuantSimple seeds_from_synQuant(&imgPC8U, variances[curr_frame], p4segVol, p4odStats);
-//    for(int i=53;i<66;i++){
-//        ccShowSliceLabelMat(seeds_from_synQuant.idMap,i);
-//    }
 
+    for(int z=0;z<100;z++){
+        ccShowSliceLabelMat(seeds_from_synQuant.idMap,z);
+    }
 
     //////////////////////////////////////////////////////////////////
-    //                 2. refine the seed regions                   //
+    //                 3. refine the seed regions                   //
     //////////////////////////////////////////////////////////////////
     regionWiseAnalysis4d(&imgPC8U, &imgPCfloat255,seeds_from_synQuant.idMap,
                          seeds_from_synQuant.cell_num,curr_frame);
@@ -285,39 +284,6 @@ void MicTrackerMain::retrieve_seeds(Mat *smoothed_VolFloat, Mat *label_map_1stRo
     //ccShowSliceLabelMat(idMap_2ndRound);
 }
 
-void MicTrackerMain::boundaryTouchedTest(Mat *label_map, Mat *fgMap, bool &xy_touched, bool &z_touched){
-    int n_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
-    int n_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
-    //n_z = {  0,  0,  0,  0, 0, 0,  0, 0 };
-    int z_id, y, x;
-    size_t remain;
-    size_t page_sz = label_map->size[0] * label_map->size[1];
-    FOREACH_i_ptrMAT(label_map){
-        if(label_map->at<int>(i) > 0){
-            z_id = i / page_sz;
-            if(z_id == 0 || z_id == (label_map->size[2]-1)){
-                z_touched = true;
-                break;
-            }
-        }
-    }
-    int im_sz[] = {label_map->size[0], label_map->size[1]};
-    FOREACH_i_ptrMAT(label_map){
-        if(label_map->at<int>(i) > 0){
-            z_id = i / page_sz;
-            remain = i - z_id * page_sz;
-            y = remain / label_map->size[1];
-            x = remain - y * label_map->size[1];
-            for(int i=0; i < 8; i++){
-                if(inField(y + n_y[i], x + n_x[i], im_sz)
-                        && fgMap->at<unsigned char>(y + n_y[i], x + n_x[i], z_id) == 0){
-                    xy_touched = true;
-                    return;
-                }
-            }
-        }
-    }
-}
 
 //void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat, Mat * volStblizedFloat, Mat *idMap /*int*/, int seed_num, Mat *eigMap2d,
 //                                           Mat *eigMap3d, Mat *varMap, Mat *stblizedVarMap, vector<int> test_ids){
@@ -325,13 +291,6 @@ void MicTrackerMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat,
                                           Mat *idMapIn /*int*/, int seed_num,int curr_frame){
     Mat idMap;
     idMapIn->copyTo(idMap);
-    //1. sort the seeds based on intensity levels
-//    vector<float> seed_intensity;
-//    regionAvgIntensity(dataVolFloat, &idMap, seed_num, seed_intensity);
-    //ccShowSlice3Dmat(dataVolFloat, CV_32F);
-//    vector<size_t> seed_intensity_order;
-//    seed_intensity_order = sort_indexes(seed_intensity, false); // false->descending
-    //2. for each seed, refine it region
     vector<vector<size_t>> voxIdxList(seed_num);
     extractVoxIdxList(&idMap, voxIdxList, seed_num);
 
@@ -352,9 +311,6 @@ void MicTrackerMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat,
         if(seed.outCell_num <= 0) continue;
         subVolReplace(cell_label_maps[curr_time_point], CV_32S, seed.outputIdMap, seed.crop_range_yxz, cell_cnt);
         cell_cnt += seed.outCell_num;
-    }
-    for(int z=0;z<100;z++){
-        ccShowSliceLabelMat(cell_label_maps[curr_time_point],z);
     }
 //    removeSmallCC(cell_label_maps[curr_time_point], cell_cnt, p4segVol.min_cell_sz, true);
     number_cells[curr_time_point] = cell_cnt;
@@ -441,343 +397,19 @@ void MicTrackerMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         watershed(img4watershed, output);
         output.convertTo(seed.outputIdMap,CV_32S);
 
-//        double tmp_min2, tmp_max2;
-//        minMaxIdx(output, &tmp_min2, &tmp_max2);
-//        if(tmp_max!=tmp_max2){
-
-//            for(int z=0;z<(seed.crop_range_yxz[2].end-seed.crop_range_yxz[2].start);z++){
-//                ccShowSliceLabelMat(PCseed_valid_CC,z);
-//            }
-
-//            for(int z=0;z<(seed.crop_range_yxz[2].end-seed.crop_range_yxz[2].start);z++){
-//                ccShowSliceLabelMat(seed.outputIdMap,z);
-//            }
-//        }
-
-    }
-
-//    for(int z=0;z<(seed.crop_range_yxz[2].end-seed.crop_range_yxz[2].start);z++){
-//        ccShowSliceLabelMat(seed.outputIdMap,z);
-//    }
-
-
-}
-
-
-
-/**
- * @brief removeOtherSeedsInfgMap: if we use thresholding, the fgMap may contains more than one seed. This will
- * not happen if we consider othercellterritory as in cellTerritoryExtractFromSeed();
- * @param seed
- * @param p4segVol
- */
-void MicTrackerMain::removeOtherSeedsInfgMap(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol){
-    //// 1. find if there is other cells in fgMap
-    vector<size_t> fg_idx = fgMapIdx(&cellSegFromSynQuant.fgMap, CV_8U, 0);
-    bool other_cell_exist = false;
-    FOREACH_i(fg_idx){
-        if(seed.idMap.at<int>(fg_idx[i]) > 0 &&
-                seed.idMap.at<int>(fg_idx[i]) != seed.id){
-            other_cell_exist = true;
-            break;
-        }
-    }
-    if(!other_cell_exist){
-        return;
-    }
-    Mat seedMap = Mat::zeros(cellSegFromSynQuant.fgMap.dims, cellSegFromSynQuant.fgMap.size, CV_32S);
-    FOREACH_i(fg_idx){
-        if(seed.idMap.at<int>(fg_idx[i]) > 0){
-            if(seed.idMap.at<int>(fg_idx[i]) == seed.id){
-                seedMap.at<int>(fg_idx[i]) = 1;
-            }else{
-                seedMap.at<int>(fg_idx[i]) = 2;
-            }
-        }else if(isOnBoundary2d(&seed.validSearchAreaMap, fg_idx[i])){
-            // if the boundary of init foreground is also contained, label as sink
-            // this is only considered when we double seed.shift_yxz, since the area are
-            // too large now. The boudnary of init foreground should not be part of target
-            // cell. Before doubling seed.shift_yxz, it is possible.
-            seedMap.at<int>(fg_idx[i]) = 2;
-        }
-    }
-    Mat grownSeedMap2d, grownSeedMap3d;
-    bool bg2sink = true;
-    //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
-    //ccShowSliceLabelMat(seedMap);
-    regionGrow(&seedMap, 2, grownSeedMap2d, &seed.score2d, &cellSegFromSynQuant.fgMap,
-               p4segVol.growConnectInTest, p4segVol.graph_cost_design, bg2sink);
-    //ccShowSliceLabelMat(grownSeedMap2d);
-    bg2sink = false;
-    regionGrow(&grownSeedMap2d, 2, grownSeedMap3d, &seed.scoreMap, &cellSegFromSynQuant.fgMap,
-               p4segVol.growConnectInRefine, p4segVol.graph_cost_design, bg2sink);
-    //ccShowSliceLabelMat(grownSeedMap3d);
-    cellSegFromSynQuant.fgMap = grownSeedMap3d == 1;
-    //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
-}
-void MicTrackerMain::cellShrinkTest(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol){
-    int extra_cell = 0;
-    for(int i = 1; i <= cellSegFromSynQuant.cell_num; i++){
-        Mat cur_cell = seed.outputIdMap == i;
-        Mat shrinked_cell, label_shrinked_cell;
-        volumeErode(&cur_cell, shrinked_cell, p4segVol.shrink_scale_yxz, MORPH_ELLIPSE);
-//        if(seed.crop_range_yxz[0].end == 94 && seed.crop_range_yxz[1].end == 123){
-//            ccShowSlice3Dmat(&shrinked_cell, CV_8U);
-//        }
-        int n = connectedComponents3d(&shrinked_cell, label_shrinked_cell, p4segVol.growConnectInRefine);
-
-        if(n > 1){
-            removeSmallCC(label_shrinked_cell, n, p4segVol.min_seed_size, true);
-            if(n > 1){
-                Mat grown_shrinked_cells;
-                bool link_bg2sink = false;
-                regionGrow(&label_shrinked_cell, n, grown_shrinked_cells, &seed.scoreMap, &cur_cell,
-                           p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
-                setValMat(seed.outputIdMap, CV_32S, &cur_cell, 0.0);
-                Mat sub_cell_mask = grown_shrinked_cells == 1;
-                setValMat(seed.outputIdMap, CV_32S, &sub_cell_mask, (float)i);
-
-                for(int j=2; j<=n; j++){
-                    sub_cell_mask = grown_shrinked_cells == j;
-                    extra_cell ++;
-                    setValMat(seed.outputIdMap, CV_32S, &sub_cell_mask, (float)(extra_cell + cellSegFromSynQuant.cell_num));
-                }
-            }
-        }
-    }
-    cellSegFromSynQuant.cell_num += extra_cell;
-}
-
-/**
- * @brief refineFgWithSeedRegion, extract the largest region if fg and remove those
- * voxels that has no z-direction neighbors
- * @param seed
- * @param p4segVol
- */
-void MicTrackerMain::refineCellTerritoryWithSeedRegion(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol){
-    Mat labelMap;
-    int n = connectedComponents3d(&cellSegFromSynQuant.fgMap, labelMap, 6);
-    //ccShowSlice3Dmat(seed.seedMap, CV_8U);
-
-    if (n > 1){
-        int id = largestRegionIdExtract(&labelMap, n, &seed.seedMap);
-        cellSegFromSynQuant.fgMap = labelMap == id;
-        //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
-    }
-    // remove pixels that happen only at one slice
-    Mat tmp_map;
-    cellSegFromSynQuant.fgMap.copyTo(tmp_map);
-    size_t page_sz = cellSegFromSynQuant.fgMap.size[1] * cellSegFromSynQuant.fgMap.size[0];
-    int width = cellSegFromSynQuant.fgMap.size[1];
-    FOREACH_ijk_ptrMAT(cellSegFromSynQuant.idMap){
-        size_t idx = vol_sub2ind(i,j,k, width, page_sz);
-        if(tmp_map.at<unsigned char>(idx) > 0){
-            if((k-1>=0 && tmp_map.at<unsigned char>(idx - page_sz) == 0) &&
-                (k+1<tmp_map.size[2] && tmp_map.at<unsigned char>(idx + page_sz) == 0)){
-                cellSegFromSynQuant.fgMap.at<unsigned char>(idx) = 0;
-            }
-        }
-    }
-    int radius[] = {1,1,0};
-    //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
-    volumeDilate(&cellSegFromSynQuant.fgMap, tmp_map, radius, MORPH_ELLIPSE);
-    n = connectedComponents3d(&tmp_map, labelMap, 26);
-    removeSmallCC(labelMap, n, p4segVol.min_cell_sz, false);
-    //cellSegFromSynQuant.fgMap = labelMap > 0;
-    bitwise_and(labelMap > 0, seed.otherIdMap==0, cellSegFromSynQuant.fgMap);
-    //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
-}
-
-/**
- * @brief fgGapRemoval: remove the gap defined by principal curvature. We jointly consider the 2d and 3d
- * principal curvature, since 3d may be too liberal to remove too much areas
- * @param seed
- * @param p4segVol
- */
-void MicTrackerMain::fgGapRemoval(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol){
-    bitwise_and(cellSegFromSynQuant.fgMap, seed.gap3dMap == 0, cellSegFromSynQuant.fgMapGapRemoved);
-
-//    if (!isempty(&cellSegFromSynQuant.fgMapGapRemoved, CV_8U)){
-//        Mat seedMapFrom2dMap, mapUnion, mapUnion_label;
-//        bitwise_and(cellSegFromSynQuant.fgMap, seed.gap2dMap == 0, seedMapFrom2dMap);// or use -
-//        bitwise_or(seedMapFrom2dMap, cellSegFromSynQuant.fgMapGapRemoved, mapUnion); // or use +
-//        int numCC = connectedComponents3d(&mapUnion, mapUnion_label, p4segVol.connect4fgGapRemoval);
-//        Mat newSeedMap; // CV_8U
-//        bool found = findUnrelatedCC(&mapUnion_label, numCC, &cellSegFromSynQuant.fgMapGapRemoved, newSeedMap);
-//        if(found){
-//            cellSegFromSynQuant.fgMapGapRemoved = cellSegFromSynQuant.fgMapGapRemoved + newSeedMap; //CV_8U
-//        }
-//    }
-}
-/**
- * @brief gapBasedRegionSegment: use principal curvature to test if current fg contains > 1 cells.
- * @param seed
- * @param p4segVol
- * @param p4odStats
- */
-void MicTrackerMain::gapBasedRegionSegment(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats){
-    // 1. remove gaps defined by principal curvature
-    fgGapRemoval(cellSegFromSynQuant, seed, p4segVol);
-    // 2. check if gaps divided the region into multiple valid seeds
-    Mat label_map;
-    int n = connectedComponents3d(&cellSegFromSynQuant.fgMapGapRemoved, label_map, p4segVol.neiMap);
-    removeSmallCC(label_map, n, p4segVol.min_seed_size, REARRANGE_IDS);
-    if(n <= 1){
-        cellSegFromSynQuant.cell_num = 1;
-        return;
-    }
-    // 3. gap test: test if the gap is true, if so, split the fg with respect to the multiple seeds
-    gapTest2SplitCellTerritory(cellSegFromSynQuant, &label_map, n, seed, p4segVol, p4odStats);
-}
-/**
- * @brief gapTest2SplitCellTerritory: Given a seeds_map, test if the gap between any two seeds are true or false.
- * If true, keep them. Otherwise, merge the two seeds divided by the gap. If the gap is indeed dimmer than the
- * two seeds it split, it is true. Otherwise false.
- * @param seeds_Map:cv_32s
- * @param n
- * @param seed
- * @param p4segVol
- * @param p4odStats
- */
-void MicTrackerMain::gapTest2SplitCellTerritory(synQuantSimple &cellSegFromSynQuant, Mat* seeds_Map /*CV_32S*/, int n,
-                                                singleCellSeed &seed, segParameter &p4segVol,
-                                                odStatsParameter &p4odStats){
-    double maxId;
-    minMaxIdx(*seeds_Map, nullptr, &maxId);
-    // 1. first grow all seeds until they touch with each other
-    Mat grown_seedMap;
-    //Mat scoreMap = seed.score2d + seed.score3d;
-    bool link_bg2sink = false; // this can force seeds to grow as much as they can
-    regionGrow(seeds_Map, n, grown_seedMap, &seed.scoreMap, &cellSegFromSynQuant.fgMap,
-               p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
-    //ccShowSliceLabelMat(seeds_Map);
-    //ccShowSliceLabelMat(&grown_seedMap);
-
-
-    // 2. for the connected seeds, test if the gap among them are true
-    // the gap are choosen by dilating the seed regions
-    vector<int> gap_tested_true(n*n, 0); // 0 not tested, -1 tested but merge, 1 tested split
-    float p_treshold = p4odStats.gapTestThreshold / (p4segVol.gapTestMinMaxRadius[1] - p4segVol.gapTestMinMaxRadius[0]);
-    vector<size_t> real_gap_idx;
-    for(int r = p4segVol.gapTestMinMaxRadius[0]; r <= p4segVol.gapTestMinMaxRadius[1]; r++){
-        vector<vector<size_t>> gap_idx_list;
-        extractGapVoxel(&grown_seedMap, &cellSegFromSynQuant.fgMap, n, r, gap_idx_list, gap_tested_true);
-        FOREACH_i(gap_idx_list){
-            gap_tested_true[i] = 1;
-        }
-        gap_idx_list.clear();
-    }
-    if (real_gap_idx.size() > 0){
-        vector<vector<int>> groups;
-        FOREACH_i(gap_tested_true){
-            if(gap_tested_true[i] == -1){
-                int target0 = i / n + 1;
-                int target1 = i % n + 1;
-                groups.push_back({target0, target1});
-            }
-        }
-        mergeIntersectGroups(groups);
-        vector<int> label_map (n);
-        FOREACH_i(label_map){
-            label_map[i] = i + 1;
-        }
-        FOREACH_i(groups){
-            //vec_unique(groups[i]); //sorted also
-            for(size_t j = 1; j < groups[i].size(); j++){
-                assert(label_map[groups[i][j] - 1] == groups[i][j] || label_map[groups[i][j] - 1] == groups[i][0]);// "Duplicated Regions in two groups");
-                label_map[groups[i][j] - 1] = groups[i][0];
-            }
-        }
-
-        FOREACH_i_MAT(grown_seedMap){
-            if(grown_seedMap.at<int>(i) > 0){
-                grown_seedMap.at<int>(i) = label_map[grown_seedMap.at<int>(i) - 1];
-            }
-        }
-        //ccShowSliceLabelMat(&grown_seedMap);
-        vector<size_t> non_used;
-        cellSegFromSynQuant.cell_num = rearrangeIdMap(&grown_seedMap, *cellSegFromSynQuant.idMap, non_used);
-
-        FOREACH_i(real_gap_idx){ // remove the real gaps
-            cellSegFromSynQuant.idMap->at<int>(real_gap_idx[i]) = 0;
-        }
-    }else{
-        if(cellSegFromSynQuant.idMap->empty()){
-            cellSegFromSynQuant.idMap->create(cellSegFromSynQuant.fgMap.dims,
-                                              cellSegFromSynQuant.fgMap.size,
-                                              CV_32S);
-        }
-        FOREACH_i_MAT(cellSegFromSynQuant.fgMap){
-            if (cellSegFromSynQuant.fgMap.at<unsigned char>(i) > 0){
-                cellSegFromSynQuant.idMap->at<int>(i) = 1;
-            }
-        }
-
-        cellSegFromSynQuant.cell_num = 1;
     }
 }
 
+bool MicTrackerMain::saveSegResults(const QString &fileName){
+    string fileNameNoExt = fileName.left(fileName.lastIndexOf('.')).toStdString();
+    // save label data
+    string label_file_name = fileNameNoExt + "_label_map_int32.bin";
+    ofstream label_file(label_file_name, ios::binary);
+    if (!label_file.is_open()) return false;
+    // tmp is local variable, which will be released soon, so we need copyTo
+    label_file.write((const char*)(cell_label_maps[curr_time_point].data),
+                     cell_label_maps[curr_time_point].elemSize() * cell_label_maps[curr_time_point].total());
+    label_file.close();
 
-Mat * MicTrackerMain::extract3d(Mat *data_grayim4d,int curr_frame){
-    // test
-    long sz_single_frame = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
-    curr_time_point = curr_frame;
-    unsigned char *ind = (unsigned char*)data_grayim4d->data + sz_single_frame*curr_time_point; // sub-matrix pointer
-    Mat *data_grayim3d = new Mat(3, data_grayim4d->size, CV_8U, ind);
-    return data_grayim3d;
-}
-
-Mat * MicTrackerMain::extract2d(Mat *data_grayim3d,int curr_slice,int datatype){
-
-
-
-    int sz_single_slice =data_rows_cols_slices[0]*data_rows_cols_slices[1];
-    Mat *single_slice;
-    if(datatype == CV_8U){
-        uchar * ind;
-        ind = ((uchar*)data_grayim3d->data) + sz_single_slice*curr_slice; // sub-matrix pointer
-        single_slice=new Mat(2, data_grayim3d->size, datatype, ind);
-    }else if(datatype == CV_32F){
-        float * ind;
-        ind = ((float*)data_grayim3d->data) + sz_single_slice*curr_slice; // sub-matrix pointer
-        single_slice=new Mat(2, data_grayim3d->size, datatype, ind);
-    }
-    return single_slice;
-}
-
-void MicTrackerMain::showSlice(Mat *data_grayim3d,int curr_slice,int datatype){
-
-
-
-    int sz_single_slice =data_rows_cols_slices[0]*data_rows_cols_slices[1];
-    Mat *single_slice;
-    if(datatype == CV_8U){
-        uchar * ind;
-        ind = ((uchar*)data_grayim3d->data) + sz_single_slice*curr_slice; // sub-matrix pointer
-        single_slice=new Mat(2, data_grayim3d->size, datatype, ind);
-    }else if(datatype == CV_32F){
-        float * ind;
-        ind = ((float*)data_grayim3d->data) + sz_single_slice*curr_slice; // sub-matrix pointer
-        single_slice=new Mat(2, data_grayim3d->size, datatype, ind);
-    }
-
-
-    QTextStream out(stdout);
-    out<<"test:"<<Qt::endl;
-    for(int i=0;i<data_rows_cols_slices[0];i++){
-        for(int j=0;j<data_rows_cols_slices[1];j++){
-            if(datatype == CV_8U){
-                out<<single_slice->at<uchar>(i,j)<<"\t";
-            }else if(datatype == CV_32F){
-                out<<single_slice->at<float>(i,j)<<"\t";
-            }
-
-        }
-        out<<Qt::endl;
-    }
-}
-
-size_t MicTrackerMain::sub2idx(int x,int y,int z,int y_size, int xy_size){
-    size_t idx = z * xy_size +  x * y_size + y;
-    return idx;
+    return true;
 }
