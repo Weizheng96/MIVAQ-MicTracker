@@ -15,6 +15,7 @@
 #include "raycasting/raycastcanvas.h"
 #include "cellsegmentation/cellsegment_main.h"
 #include "celltracking/celltracking_main.h"
+#include "MicTracker_test/mictrackermain.h"
 
 enum widget_type_choice {my_simple_test_type = 0, raycast_type = 1, vaa3d_type = 2};
 
@@ -39,6 +40,7 @@ public slots:
     void setTimeBasedOnCurrentStatus(int t);
     void setBackgroundColor();
     void setSavePath();
+
     //void setAxesCheckBox(bool axesOn);
     // parameters
 public:
@@ -99,9 +101,22 @@ public:
     int track_res_vis_method = OVERLAY_IN_CANVAS;
     Mat3b colormap4tracking_res;
 
+
 public slots:
     void debugAlgorithm();
     void debugBatchFusion();
+
+// test MicTracker
+public slots:
+    // function
+    void sendData4MicTracker_function1();
+public:
+    // menu
+    QMenu *micTrackerMenu;
+    QAction *micTracker_test1;
+    MicTrackerMain * micTracker=nullptr;
+
+//end test
 
 };
 #endif // MAINWINDOW_H

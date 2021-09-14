@@ -1,3 +1,4 @@
+
 /** the basic function used in volume image processing */
 
 #include "img_basic_proc.h"
@@ -2327,9 +2328,9 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
 }
 
 /** adjacentRegions: return the region adjacent to curr_label
- * if no test_ada_label is input, return all the adj_labels, other wise only return true or false indicating 
+ * if no test_ada_label is input, return all the adj_labels, other wise only return true or false indicating
  * if test_ajd_label is indeed adjacent to curr_label.
- * 
+ *
  * **/
 bool adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int test_adj_label,int connect){
     vector<int> n_y(connect), n_x(connect), n_z(connect);
@@ -2439,9 +2440,9 @@ void idx2tightBwMap(vector<size_t> idx, MatSize org_sz_yxz, Mat1b &bwMap, int *s
 }
 
 /** adjacentRegions: return the region adjacent to curr_label
- * if no test_ada_label is input, return all the adj_labels, other wise only return true or false indicating 
+ * if no test_ada_label is input, return all the adj_labels, other wise only return true or false indicating
  * if test_ajd_label is indeed adjacent to curr_label.
- * 
+ *
  * **/
 void adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int curr_label, unordered_set<int> &adj_labels, int connect){
     vector<int> n_y(connect), n_x(connect), n_z(connect);
@@ -3141,4 +3142,179 @@ void ccShowSliceLabelMat(Mat *src3d, int slice){
             destroyWindow(title);
         }
     }
+}
+
+
+// added
+void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], bool overloadFlag, int minIntensity = 0){
+    src3d->copyTo(dst3d);
+//    ccShowSlice3Dmat(src3d, CV_32F,20);
+    gaussianSmooth3Ddata(dst3d, sigma,6);
+//    test(&dst3d);
+//    ccShowSlice3Dmat(dst3d, CV_32F,20);
+    int x_size  = dst3d.size[0];
+    int y_size  = dst3d.size[1];
+    int z_size  = dst3d.size[2];
+    size_t xy_size = x_size*y_size;
+
+    // Filter XY dimensions for every Z
+    Mat kernelx = (Mat_<float>(1,3)<<-0.5, 0, 0.5);//(x0+x2)/2
+    Mat kernely = (Mat_<float>(3,1)<<-0.5, 0, 0.5);//(y0+y2)/2
+    Mat kernelz = (Mat_<float>(1,3)<<-0.5, 0, 0.5);//(z0+z2)/2;
+    Mat Dz, Dzz;
+    Dz.create(dst3d.dims, dst3d.size, CV_32F);
+    Dzz.create(dst3d.dims, dst3d.size, CV_32F);
+    filterZdirection(&dst3d, Dz, kernelz,0);
+//    test(&dst3d);
+//    test(&Dz);
+    //ccShowSlice3Dmat(&Dz, CV_32F, 5);
+    filterZdirection(&Dz, Dzz, kernelz,0);
+//    test(&Dzz);
+    //ccShowSlice3Dmat(&Dzz, CV_32F, 5);
+    int mat_sizes[] = {3,3};
+    Mat mat3x3(2, mat_sizes, CV_32F, Scalar(0));
+    Mat eigen_values;
+    // test
+//    int maxx=0;
+//    int maxy=0;
+//    int maxz=0;
+//    float maxPC=0;
+    //
+    for (int z = 0; z < z_size; z++)
+    {
+        float *ind = (float*)dst3d.data + z * xy_size; // sub-matrix pointer
+        Mat subMatrix(2, dst3d.size, CV_32F, ind);
+
+        Mat lx, ly, lxx, lyy, lxy, lzx, lzy;
+        filter2D(subMatrix, lx, -1, kernelx);
+        filter2D(subMatrix, ly, -1, kernely);
+        filter2D(lx, lxx, -1, kernelx);
+        filter2D(ly, lyy, -1, kernely);
+        filter2D(lx, lxy, -1, kernely);
+
+        Mat lz(2, dst3d.size, CV_32F, (float*)Dz.data + z * xy_size);
+        filter2D(lz, lzx, -1, kernelx);
+        filter2D(lz, lzy, -1, kernely);
+        //ccShowSlice3Dmat(&Dzz, CV_32F, 5);
+        Mat lzz(2, dst3d.size, CV_32F, (float*)Dzz.data + z * xy_size);
+        for (int r = 0; r < x_size; r ++){
+            size_t increment = r * y_size;
+            for (int c = 0; c < y_size; c ++){
+                size_t idx = z*xy_size + c + increment;
+                if (src3d->at<float>(idx) <= minIntensity||r<2||r>x_size-3||c<2||c>y_size-3){
+                    dst3d.at<float>(idx) = 0;
+                    continue;
+                }
+                mat3x3.at<float>(0,0) = lxx.at<float>(r,c);
+                mat3x3.at<float>(1,1) = lyy.at<float>(r,c);
+                mat3x3.at<float>(2,2) = lzz.at<float>(r,c);
+
+                mat3x3.at<float>(0,1) = lxy.at<float>(r,c);
+                mat3x3.at<float>(1,0) = lxy.at<float>(r,c);
+
+                mat3x3.at<float>(0,2) = lzx.at<float>(r,c);
+                mat3x3.at<float>(2,0) = lzx.at<float>(r,c);
+
+                mat3x3.at<float>(1,2) = lzy.at<float>(r,c);
+                mat3x3.at<float>(2,1) = lzy.at<float>(r,c);
+
+                eigen(mat3x3, eigen_values);
+                dst3d.at<float>(idx) = eigen_values.at<float>(0); // the largest eigen value
+//                if(maxPC<dst3d.at<float>(idx)){
+//                    maxPC=dst3d.at<float>(idx);
+//                    maxx=r;
+//                    maxy=c;
+//                    maxz=z;
+//                }
+            }
+        }
+        //sepFilter2D(subMatrix, subMatrix, CV_32F, kernel_row.t(), kernel_col, Point(-1,-1), 0.0, BORDER_REPLICATE);
+    }
+//    test(&dst3d);
+}
+
+void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[],int sizeRatio)
+{
+    assert(data4smooth.dims == 3);
+    int x_size  = data4smooth.size[0];
+    int y_size  = data4smooth.size[1];
+    int z_size  = data4smooth.size[2];
+    size_t xy_size = x_size*y_size;
+
+    int kernDimension = ceil(sizeRatio*sigma[0])+1;
+    Mat kernel_row = getGaussianKernel(kernDimension, sigma[0], CV_32F);
+    kernDimension = ceil(sizeRatio*sigma[1])+1;
+    Mat kernel_col = getGaussianKernel(kernDimension, sigma[1], CV_32F);
+
+    for (int z = 0; z < z_size; z++)
+    {
+        float *ind = (float*)data4smooth.data + z * xy_size; // sub-matrix pointer
+        Mat subMatrix(2, data4smooth.size, CV_32F, ind);
+        sepFilter2D(subMatrix, subMatrix, CV_32F, kernel_row.t(), kernel_col, Point(-1,-1), 0.0, BORDER_REPLICATE);
+    }
+    if (sigma[2] > 0){
+        kernDimension = ceil(sizeRatio*sigma[2])+1;
+        Mat kernel_z = getGaussianKernel(kernDimension, sigma[2], CV_32F);
+        // Filter Z dimension
+        Mat copyMat;
+        data4smooth.copyTo(copyMat);
+        filterZdirection(&copyMat, data4smooth, kernel_z);
+    }
+}
+
+void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernel_z,int edge){
+    assert(src3d->dims == 3);
+    if (dst3d.empty()) dst3d.create(src3d->dims, src3d->size, CV_32F);
+    int x_size  = src3d->size[0];
+    int y_size  = src3d->size[1];
+    int z_size  = src3d->size[2];
+    size_t xy_size = x_size*y_size;
+    // Filter Z dimension
+    float* kernData = (float *)kernel_z.data;
+    unsigned kernSize = kernel_z.total(); // should be odd
+    int kernMargin = (kernSize - 1)/2;
+    float* lineBuffer = new float[z_size + 2*kernMargin];
+    for (int y = 0; y < y_size; y++)
+    {
+        for (int x = 0; x < x_size; x++)
+        {
+            // Copy along Z dimension into a line buffer
+            float* z_ptr = (float*)src3d->data + x * y_size + y;//same as data4smooth.ptr<float>(0, y, x)
+            for (int z = 0; z < z_size; z++, z_ptr += xy_size)
+            {
+                lineBuffer[z + kernMargin] = *z_ptr;
+            }
+
+            // Replicate borders
+            for (int m = 0; m < kernMargin; m++)
+            {
+                lineBuffer[m] = lineBuffer[kernMargin];// replicate left side
+                lineBuffer[z_size + 2*kernMargin - 1 - m] = lineBuffer[kernMargin + z_size - 1];//replicate right side
+            }
+
+            // Filter line buffer 1D - convolution
+            z_ptr = (float*)dst3d.data + x * y_size + y;
+            for (int z = 0; z < z_size; z++, z_ptr += xy_size)
+            {
+                *z_ptr = 0.0f;
+                if(z==0){
+                    for (unsigned k = 0; k < kernSize; k++)
+                    {
+                        *z_ptr += lineBuffer[z+k]*kernData[k]*2;
+                    }
+                }else if(z<z_size-1){
+                    for (unsigned k = 0; k < kernSize; k++)
+                    {
+                        *z_ptr += lineBuffer[z+k]*kernData[k];
+                    }
+                }else{
+                    for (unsigned k = 0; k < kernSize; k++)
+                    {
+                        *z_ptr += lineBuffer[z+k]*kernData[k]*2;
+                    }
+                }
+            }
+        }
+    }
+    delete [] lineBuffer;
 }

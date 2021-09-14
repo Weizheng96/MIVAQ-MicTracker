@@ -81,11 +81,17 @@ enum canvas_right_click_operation_set {RRIGHT_CLICK_OPR_NONE, RRIGHT_CLICK_OPR_S
 const int n8_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
 const int n8_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
 
+// test functions
+void test(Mat * src3d);
+// functions
 void principalCv2d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
 void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
+void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], bool overloadFlag, int minIntensity);
 void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[]);
+void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[],int sizeRatio);
 void filterVolume(Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction);
 void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernal_z);
+void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernel_z,int edge);
 float truncatedGauss(float mu, float sigma, float lower, float upper, float &t_mu, float &t_sigma);
 float varByTruncate(vector<float> vals4var, int numSigma, int numIter);
 float calVarianceStablization(Mat *src3d, Mat & varMap, vector<float> &varTrend, float validRatio = 0.95, int gap=2);

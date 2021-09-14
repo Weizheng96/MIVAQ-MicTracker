@@ -10,6 +10,8 @@ CONFIG += c++17
 #DEFINES += USE_Qt5 # for vaa3d functions
 
 SOURCES += data_importer.cpp \
+    MicTracker_test/mictrackermain.cpp \
+    MicTracker_test/parameter4mictracker.cpp \
     cellsegmentation/cellsegment_main.cpp \
     cellsegmentation/img_basic_proc.cpp \
     cellsegmentation/maxflow_bk/graph.cpp \
@@ -41,6 +43,8 @@ SOURCES += data_importer.cpp \
     src_3rd/io/io_bioformats.cpp
 
 HEADERS += data_importer.h \
+    MicTracker_test/mictrackermain.h \
+    MicTracker_test/parameter4mictracker.h \
     cellsegmentation/cc3d.hpp \
     cellsegmentation/cellsegment_main.h \
     cellsegmentation/img_basic_proc.h \
@@ -177,5 +181,6 @@ LIBS += -L$$PWD/src_3rd/common_lib/src_packages/mylib_tiff/ -lmylib # for usage 
 #else:unix: PRE_TARGETDEPS += $$PWD/src_3rd/common_lib/src_packages/mylib_tiff/libmylib.a
 
 RESOURCES += \
+    Pictures/res.qrc \
     qdarkstyle/style.qrc \
     raycasting/resources.qrc

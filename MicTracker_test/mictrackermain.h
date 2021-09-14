@@ -1,33 +1,30 @@
-#ifndef CELLSEGMENT_MAIN_H
-#define CELLSEGMENT_MAIN_H
+#ifndef MICTRACKERMAIN_H
+#define MICTRACKERMAIN_H
+
 #include <opencv2/core.hpp> //basic building blocks of opencv
 #include <opencv2/imgcodecs.hpp> // image io
 #include <opencv2/highgui.hpp> //image display
-#include "synquant_simple.h"
+#include "cellsegmentation/synquant_simple.h"
 
-//#include "../raycasting/raycastcanvas.h"
-//#include "../celltracking/celltracking_main.h"
-//#include "vol_basic_proc.hpp"
-//#define VOLUME_WH_MAX 100000
 
-class cellSegmentMain
+
+
+class MicTrackerMain
 {
 public:
-    cellSegmentMain(void *data_grayim4d, int _data_type, long buffSize[5]/*(x,y,z,c,t)*/);
-    ~cellSegmentMain(){
-        //if(data_rows_cols_slices) delete data_rows_cols_slices;
-        //if(time_points_processed) delete time_points_processed;
-    };
-    void processSingleFrameAndReturn(int curr_timePoint_in_canvas, const QString &fileName = "", bool track_needed=true);
-    //void processAllFramesAndReturn(RayCastCanvas *glWidget);
-    void cellSegmentSingleFrame(cv::Mat *data_grayim3d, std::size_t curr_frame);
-    void regionWiseAnalysis4d(cv::Mat *data_grayim3d, cv::Mat *dataVolFloat, cv::Mat * volStblizedFloat,
-                              cv::Mat *idMapIn /*int*/, int seed_num, int frame, bool roundOne);
+    MicTrackerMain(void *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/);
+    void processSingleFrameAndReturn(int curr_timePoint_in_canvas);
+    void cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_frame);
+    void regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat,
+                              Mat *idMapIn /*int*/, int seed_num,
+                              int curr_frame);
+    int getMaxContrast(Mat *data_grayim3d);
     //void cropSeed(vector<size_t> idx_yxz, Mat *data_3d, int shift_yxz[3]);
-    void cropSeed(int seed_id, std::vector<std::size_t> idx_yxz, cv::Mat *data_grayim3d, cv::Mat *data_stbized,
-                  cv::Mat *idMap, int frame, singleCellSeed &seed, segParameter p4segVol);
+    void cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d,
+                                  Mat *idMap, int curr_frame, singleCellSeed &seed,
+                                  segParameter p4segVol);
     // the key function to get cell territory
-    int refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol);
+    void refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol);
     // functions called in refineSeed2Region
     void refineCellTerritoryWithSeedRegion(synQuantSimple& cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol);
     void refineCellsTerritoriesWithSeedRegions(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol);
@@ -39,8 +36,14 @@ public:
 
     void retrieve_seeds(Mat *dataVolFloat, Mat *label_map_1stRound, size_t cell_num_1stRound,
                         Mat *cellGapMap, Mat &idMap_2ndRound, int &seed_num_2ndRound);
-    bool loadSegResults(const QString &fileName, bool track_needed=true);
-    bool saveSegResults(const QString &fileName);
+
+    void boundaryTouchedTest(Mat *label_map, Mat *fgMap, bool &xy_touched, bool &z_touched);
+
+    Mat * extract3d(Mat *data_grayim4d,int curr_frame);
+    Mat * extract2d(Mat *data_grayim3d,int curr_slice,int datatype);
+    void showSlice(Mat *data_grayim3d,int curr_slice,int datatype);
+    size_t sub2idx(int x,int y,int z,int y_size, int xy_size);
+
 public:
     string debug_folder;
     float scale_cell_seed_shift_bndtest[6] = {6, 2, 3, 3, 2, 1.5};
@@ -65,18 +68,17 @@ public:
     std::vector<std::size_t> number_cells;
     //std::vector<std::vector<std::size_t>> voxIdxList; // cell voxIdx list
 
-    friend class cellTrackingMain;
 public:
     void init_parameter(){
         debug_folder = "/home/ccw/Desktop/embryo_res_folder/";
         default_name = debug_folder + "test.tiff";
-        p4segVol.min_intensity = 0.0;
-        p4segVol.fdr = .05;
-        p4segVol.min_cell_sz = round(100 / scale_cell_seed_shift_bndtest[0]);
-        p4segVol.max_cell_sz = round(3000 / scale_cell_seed_shift_bndtest[0]);
+        p4segVol.min_intensity = -1.0;
+        p4segVol.fdr = 0.0;
+        p4segVol.min_cell_sz = 50;
+        p4segVol.max_cell_sz = 10000;
         p4segVol.min_fill = 0.0001;
         p4segVol.max_WHRatio = 100;
-        p4segVol.min_seed_size = round(10 / scale_cell_seed_shift_bndtest[1]);
+        p4segVol.min_seed_size = 10;
         p4segVol.graph_cost_design[0] = ARITHMETIC_AVERAGE; //default 1, GEOMETRIC_AVERAGE = 2;
         p4segVol.graph_cost_design[1] = 2;
         p4segVol.growConnectInTest = 4;
@@ -114,6 +116,7 @@ public:
         p4segVol.shift_yxz[1] = round(20 / scale_cell_seed_shift_bndtest[3]);
         p4segVol.shift_yxz[2] = round(4 / scale_cell_seed_shift_bndtest[4]);
     }
+
 };
 
-#endif // CELLSEGMENT_MAIN_H
+#endif // MICTRACKERMAIN_H
