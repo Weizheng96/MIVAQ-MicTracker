@@ -11,6 +11,7 @@ CONFIG += c++17
 
 SOURCES += data_importer.cpp \
     MicTracker_test/mictrackermain.cpp \
+    MicTracker_test/mictrackerrefinebytempcons.cpp \
     MicTracker_test/parameter4mictracker.cpp \
     cellsegmentation/cellsegment_main.cpp \
     cellsegmentation/img_basic_proc.cpp \
@@ -44,6 +45,7 @@ SOURCES += data_importer.cpp \
 
 HEADERS += data_importer.h \
     MicTracker_test/mictrackermain.h \
+    MicTracker_test/mictrackerrefinebytempcons.h \
     MicTracker_test/parameter4mictracker.h \
     cellsegmentation/cc3d.hpp \
     cellsegmentation/cellsegment_main.h \

@@ -16,6 +16,8 @@
 #include "cellsegmentation/cellsegment_main.h"
 #include "celltracking/celltracking_main.h"
 #include "MicTracker_test/mictrackermain.h"
+#include "MicTracker_test/mictrackerrefinebytempcons.h"
+
 
 enum widget_type_choice {my_simple_test_type = 0, raycast_type = 1, vaa3d_type = 2};
 

@@ -87,8 +87,10 @@ void test(Mat * src3d);
 void principalCv2d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
 void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
 void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], bool overloadFlag, int minIntensity);
+float eigen_value3D(Mat mat3x3);
 void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[]);
 void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[],int sizeRatio);
+void averageSmooth3Ddata(Mat &data4smooth, int size);
 void filterVolume(Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction);
 void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernal_z);
 void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernel_z,int edge);
@@ -110,6 +112,9 @@ void extractVolume(Mat *label3d, vector<size_t> &voxSzList, int numCC);
 bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = true);
 void volumeDilate(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
 void volumeErode(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
+void volumeDilate3D(Mat *src3d, Mat &dst3d, int radiusValues);
+void volumeErode3D(Mat *src3d, Mat &dst3d, int radiusValues);
+
 
 void volumeWrite(Mat *src3d, string filename);
 

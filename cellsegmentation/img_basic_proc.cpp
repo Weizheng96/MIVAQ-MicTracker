@@ -1025,6 +1025,7 @@ void volumeDilate(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
 
 }
 
+
 //// This volume dilation and erosion algorithm should be implemented using distance transform with
 /// O(n) complexity. (Though now is already O(n), the constant part is large.)
 /**
@@ -1080,6 +1081,92 @@ void volumeErode(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
         }
     }
     //ccShowSlice3Dmat(&dst3d, CV_8U);
+}
+
+/**
+ * @brief volumeDilate3D
+ * @param src3d: boolean (but represented by CV_8U)
+ * @param dst3d
+ * @param kernel
+ */
+void volumeDilate3D(Mat *src3d, Mat &dst3d, int radiusValues){
+    assert(src3d->dims == 3);
+    int x_size  = src3d->size[0];
+    int y_size  = src3d->size[1];
+    int z_size  = src3d->size[2];
+    size_t xy_size = x_size*y_size;
+
+    src3d->copyTo(dst3d);
+    Mat element = getStructuringElement(MORPH_RECT,
+                           Size( 3, 3 ),
+                           Point( 1, 1 ) );
+    for(int dst=0;dst<radiusValues;dst++){
+        for (int z = 0;z < z_size; z++)
+        {
+            unsigned char *ind = (unsigned char*)dst3d.data + z * xy_size; // sub-matrix pointer
+            Mat subMatrix(2, dst3d.size, CV_8U, ind);
+            if(z>0){
+                ind = (unsigned char*)dst3d.data + (z-1) * xy_size; // sub-matrix pointer
+                Mat Temp1(2, dst3d.size, CV_8U, ind);
+                max(subMatrix,Temp1,subMatrix);
+            }
+            if(z<z_size-1){
+                ind = (unsigned char*)dst3d.data + (z+1) * xy_size; // sub-matrix pointer
+                Mat Temp2(2, dst3d.size, CV_8U, ind);
+                max(subMatrix,Temp2,subMatrix);
+            }
+        }
+        for (int z = 0; z < z_size; z++)
+        {
+            unsigned char *ind = (unsigned char*)dst3d.data + z * xy_size; // sub-matrix pointer
+            Mat subMatrix(2, dst3d.size, CV_8U, ind);
+            dilate(subMatrix, subMatrix, element);
+        }
+    }
+
+}
+
+/**
+ * @brief volumeDilate3D
+ * @param src3d: boolean (but represented by CV_8U)
+ * @param dst3d
+ * @param kernel
+ */
+void volumeErode3D(Mat *src3d, Mat &dst3d, int radiusValues){
+    assert(src3d->dims == 3);
+    int x_size  = src3d->size[0];
+    int y_size  = src3d->size[1];
+    int z_size  = src3d->size[2];
+    size_t xy_size = x_size*y_size;
+
+    src3d->copyTo(dst3d);
+    Mat element = getStructuringElement(MORPH_RECT,
+                           Size( 3, 3 ),
+                           Point( 1, 1 ) );
+    for(int dst=0;dst<radiusValues;dst++){
+        for (int z = 0;z < z_size; z++)
+        {
+            unsigned char *ind = (unsigned char*)dst3d.data + z * xy_size; // sub-matrix pointer
+            Mat subMatrix(2, dst3d.size, CV_8U, ind);
+            if(z>0){
+                ind = (unsigned char*)dst3d.data + (z-1) * xy_size; // sub-matrix pointer
+                Mat Temp1(2, dst3d.size, CV_8U, ind);
+                min(subMatrix,Temp1,subMatrix);
+            }
+            if(z<z_size-1){
+                ind = (unsigned char*)dst3d.data + (z+1) * xy_size; // sub-matrix pointer
+                Mat Temp2(2, dst3d.size, CV_8U, ind);
+                min(subMatrix,Temp2,subMatrix);
+            }
+        }
+        for (int z = 0; z < z_size; z++)
+        {
+            unsigned char *ind = (unsigned char*)dst3d.data + z * xy_size; // sub-matrix pointer
+            Mat subMatrix(2, dst3d.size, CV_8U, ind);
+            erode(subMatrix, subMatrix, element);
+        }
+    }
+
 }
 
 void volumeWrite(Mat *src3d, string filename){
@@ -3218,19 +3305,42 @@ void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], bool overloadFlag, int
                 mat3x3.at<float>(1,2) = lzy.at<float>(r,c);
                 mat3x3.at<float>(2,1) = lzy.at<float>(r,c);
 
-                eigen(mat3x3, eigen_values);
-                dst3d.at<float>(idx) = eigen_values.at<float>(0); // the largest eigen value
-//                if(maxPC<dst3d.at<float>(idx)){
-//                    maxPC=dst3d.at<float>(idx);
-//                    maxx=r;
-//                    maxy=c;
-//                    maxz=z;
-//                }
+//                eigen(mat3x3, eigen_values);
+//                dst3d.at<float>(idx) = eigen_values.at<float>(0); // the largest eigen value
+                dst3d.at<float>(idx) =eigen_value3D(mat3x3);
             }
         }
-        //sepFilter2D(subMatrix, subMatrix, CV_32F, kernel_row.t(), kernel_col, Point(-1,-1), 0.0, BORDER_REPLICATE);
     }
 //    test(&dst3d);
+}
+
+float eigen_value3D(Mat mat3x3){
+    float a=-mat3x3.at<float>(0,0)
+            -mat3x3.at<float>(1,1)
+            -mat3x3.at<float>(2,2);
+    float b=-pow(mat3x3.at<float>(1,2),2)
+            -pow(mat3x3.at<float>(0,1),2)
+            -pow(mat3x3.at<float>(0,2),2)
+            +mat3x3.at<float>(0,0)*mat3x3.at<float>(2,2)
+            +mat3x3.at<float>(1,1)*mat3x3.at<float>(2,2)
+            +mat3x3.at<float>(0,0)*mat3x3.at<float>(1,1);
+    float c=-mat3x3.at<float>(0,0)*mat3x3.at<float>(1,1)*mat3x3.at<float>(2,2)
+            -mat3x3.at<float>(0,1)*mat3x3.at<float>(1,2)*mat3x3.at<float>(0,2)*2
+            +mat3x3.at<float>(0,0)*mat3x3.at<float>(1,2)*mat3x3.at<float>(1,2)
+            +mat3x3.at<float>(2,2)*mat3x3.at<float>(0,1)*mat3x3.at<float>(0,1)
+            +mat3x3.at<float>(1,1)*mat3x3.at<float>(0,2)*mat3x3.at<float>(0,2);
+    float p=b-pow(a,2)/3;
+    float q=2*pow(a,3)/27-a*b/3+c;
+    float pi=3.1415926535897;
+    float temp1=3*q/(2*p)*sqrt(-3/p);
+    float temp2=2/sqrt(3)*(sqrt(-p));
+    float temp=1/3*acos(min((float)0.999999,max((float)-0.999999,temp1)));
+
+    float curvature1=temp2*cos(temp - 2*pi/3) - a/3;
+    float curvature2=temp2*cos(temp - 4*pi/3) - a/3;
+    float curvature3=temp2*cos(temp) - a/3;
+
+    return max(curvature1,max(curvature2,curvature3));
 }
 
 void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[],int sizeRatio)
@@ -3259,6 +3369,31 @@ void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[],int sizeRatio)
         Mat copyMat;
         data4smooth.copyTo(copyMat);
         filterZdirection(&copyMat, data4smooth, kernel_z);
+    }
+}
+
+void averageSmooth3Ddata(Mat &data4smooth, int size)
+{
+    assert(data4smooth.dims == 3);
+    int x_size  = data4smooth.size[0];
+    int y_size  = data4smooth.size[1];
+    int z_size  = data4smooth.size[2];
+    size_t xy_size = x_size*y_size;
+
+
+    Mat kernel = Mat::ones( size,1,CV_32F )/size;
+
+    for (int z = 0; z < z_size; z++)
+    {
+        float *ind = (float*)data4smooth.data + z * xy_size; // sub-matrix pointer
+        Mat subMatrix(2, data4smooth.size, CV_32F, ind);
+        sepFilter2D(subMatrix, subMatrix, CV_32F, kernel.t(), kernel, Point(-1,-1), 0.0, BORDER_REPLICATE);
+    }
+    if (true){
+        // Filter Z dimension
+        Mat copyMat;
+        data4smooth.copyTo(copyMat);
+        filterZdirection(&copyMat, data4smooth, kernel);
     }
 }
 

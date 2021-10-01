@@ -15,12 +15,12 @@ public:
     MicTrackerMain(void *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/);
     void processSingleFrameAndReturn(int curr_timePoint_in_canvas,const QString &fileName);
     void cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_frame);
-    void regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat,
+    void regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataPC255Float,
                               Mat *idMapIn /*int*/, int seed_num,
                               int curr_frame);
     int getMaxContrast(Mat *data_grayim3d);
     //void cropSeed(vector<size_t> idx_yxz, Mat *data_3d, int shift_yxz[3]);
-    void cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d,
+    void cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d,Mat *dataPC255Float,
                                   Mat *idMap, int curr_frame, singleCellSeed &seed,
                                   segParameter p4segVol);
     // the key function to get cell territory
@@ -28,12 +28,12 @@ public:
     void retrieve_seeds(Mat *dataVolFloat, Mat *label_map_1stRound, size_t cell_num_1stRound,
                         Mat *cellGapMap, Mat &idMap_2ndRound, int &seed_num_2ndRound);
     bool saveSegResults(const QString &fileName);
+    bool loadSegResults(const QString &fileName);
+    void seedsInfo(Mat *VolFloat, Mat *label_map, size_t cell_num);
+    void getCenterAndBoundary(vector<size_t> voxList, size_t sz[3], vector<float> &ctr, vector<size_t> &boundary);
+    bool notTouchBoundary(vector<size_t> voxList, size_t sz[3]);
+    void getForeground(Mat * data_grayim3d, Mat &foreground);
 
-
-    Mat * extract3d(Mat *data_grayim4d,int curr_frame);
-    Mat * extract2d(Mat *data_grayim3d,int curr_slice,int datatype);
-    void showSlice(Mat *data_grayim3d,int curr_slice,int datatype);
-    size_t sub2idx(int x,int y,int z,int y_size, int xy_size);
 
 public:
     string debug_folder;
@@ -49,15 +49,23 @@ public:
     odStatsParameter p4odStats;
     std::vector<cv::Mat> cell_label_maps;
     std::vector<cv::Mat> threshold_maps;
-    std::vector<cv::Mat> principalCurv2d;
     std::vector<cv::Mat> principalCurv3d;
     std::vector<cv::Mat> varMaps;
     std::vector<cv::Mat> stblizedVarMaps;
     std::vector<std::vector<float>> varTrends;
     std::vector<std::vector<float>> stblizedVarTrends;
     std::vector<float> variances;
-    std::vector<std::size_t> number_cells;
+    size_t fgThreshold=0;
+
     //std::vector<std::vector<std::size_t>> voxIdxList; // cell voxIdx list
+    // for tracking
+    std::vector<std::size_t> number_cells; // time -> object num
+    std::vector<std::vector<std::vector<std::size_t>>> VoxelIdxList; // time -> cell -> pixel->idx
+    std::vector<std::vector<float>> avgItstyVec; // time -> cell -> intensity
+    std::vector<std::vector<std::size_t>> areaVec; // time -> cell -> intensity
+    std::vector<std::vector<std::vector<float>>> ctrPt; // time -> cell -> Point Center (y,x,z)
+    std::vector<std::vector<std::vector<size_t>>> CoordinateRgs; // time -> cell -> boundary (min y, max y, min x, max x, min z, max z);
+
 
 public:
     void init_parameter(){
