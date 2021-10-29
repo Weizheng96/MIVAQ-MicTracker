@@ -5,14 +5,28 @@
 #include <opencv2/imgcodecs.hpp> // image io
 #include <opencv2/highgui.hpp> //image display
 #include "cellsegmentation/synquant_simple.h"
-
-
+#include "data_importer.h"
+#include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
+#include "mincostflow.h"
+#include "Watershed3D_WZ.h"
+#include <string>
+#include <chrono> // time elapsed
+#include <fstream> // for file stream
+#include <QTextStream>
+#include <QLabel>
+#include <QWidget>
+#include <QDebug>
 
 
 class MicTrackerMain
 {
 public:
+    //////////////////////////////////////////////////////////////////////
+    /// functions for in-frame segment
+    //////////////////////////////////////////////////////////////////////
+    MicTrackerMain();
     MicTrackerMain(void *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/);
+    void micInitialize(void *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/);
     void processSingleFrameAndReturn(int curr_timePoint_in_canvas,const QString &fileName);
     void cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_frame);
     void regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataPC255Float,
@@ -20,9 +34,11 @@ public:
                               int curr_frame);
     int getMaxContrast(Mat *data_grayim3d);
     //void cropSeed(vector<size_t> idx_yxz, Mat *data_3d, int shift_yxz[3]);
+    // for single frame
     void cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d,Mat *dataPC255Float,
                                   Mat *idMap, int curr_frame, singleCellSeed &seed,
                                   segParameter p4segVol);
+
     // the key function to get cell territory
     void refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol);
     void retrieve_seeds(Mat *dataVolFloat, Mat *label_map_1stRound, size_t cell_num_1stRound,
@@ -33,6 +49,22 @@ public:
     void getCenterAndBoundary(vector<size_t> voxList, size_t sz[3], vector<float> &ctr, vector<size_t> &boundary);
     bool notTouchBoundary(vector<size_t> voxList, size_t sz[3]);
     void getForeground(Mat * data_grayim3d, Mat &foreground);
+
+
+    //////////////////////////////////////////////////////////////////////
+    /// functions for refine
+    //////////////////////////////////////////////////////////////////////
+    void localIdMap2GlobalIdMap(vector<Mat> &localMap, vector<Mat> &globalMap, vector<size_t> cellNum);
+    void loop2_Initialization();
+    void refineBytemporalInfo_loop2(vector<size_t> numCellResVec_cur,
+                                    vector<vector<vector<size_t> > > dtctIncldLst_cur);
+    void refineBytemporalInfo_single(int currentID,vector<size_t> currentIdx,
+                                     size_t currentFrame,vector<vector<size_t>> refIdx,
+                                     vector<size_t> &cell_cnt);
+    void fillMat(Mat &dat, vector<size_t> idx, size_t value);
+    void cropSeed(int seed_id, vector<size_t> idx_yxz, vector<vector<size_t>> refIdx,
+                  Mat *scMat, Mat *idMap, singleCellSeed &seed, segParameter p4segVol);
+    static int avg(vector<int> v );
 
 
 public:
@@ -50,6 +82,7 @@ public:
     std::vector<cv::Mat> cell_label_maps;
     std::vector<cv::Mat> threshold_maps;
     std::vector<cv::Mat> principalCurv3d;
+    std::vector<cv::Mat> segScore3d;
     std::vector<cv::Mat> varMaps;
     std::vector<cv::Mat> stblizedVarMaps;
     std::vector<std::vector<float>> varTrends;
@@ -62,9 +95,19 @@ public:
     std::vector<std::size_t> number_cells; // time -> object num
     std::vector<std::vector<std::vector<std::size_t>>> VoxelIdxList; // time -> cell -> pixel->idx
     std::vector<std::vector<float>> avgItstyVec; // time -> cell -> intensity
-    std::vector<std::vector<std::size_t>> areaVec; // time -> cell -> intensity
+    std::vector<std::vector<std::size_t>> areaVec; // time -> cell -> area
     std::vector<std::vector<std::vector<float>>> ctrPt; // time -> cell -> Point Center (y,x,z)
     std::vector<std::vector<std::vector<size_t>>> CoordinateRgs; // time -> cell -> boundary (min y, max y, min x, max x, min z, max z);
+
+
+    // for refine
+    std::vector<cv::Mat> cell_label_maps_cur;
+    std::vector<cv::Mat> cell_label_maps_globalId;
+    std::vector<std::vector<std::size_t>> localId2GlobalId;
+    std::vector<std::vector<std::size_t>> globalId2LocalId;
+    std::vector<std::size_t> number_cells_cur; // time -> object num
+    MinCostFlow graphSolver;
+
 
 
 public:

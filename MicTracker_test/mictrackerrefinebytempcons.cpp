@@ -1,23 +1,62 @@
 #include "mictrackerrefinebytempcons.h"
 
-#include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
-#include <string>
-#include <chrono> // time elapsed
-#include <fstream> // for file stream
-#include <QTextStream>
-#include <boost/math/special_functions/digamma.hpp>
-#include <boost/math/special_functions/gamma.hpp>
-
-#include <QDebug>
 
 #ifndef Pi
 #define Pi 3.141592653589793238462643
-#define M_SQRT1_2 0.7071067812
 #endif
 
 using namespace cv;
 using namespace std;
 
+MicTrackerRefineByTempCons::MicTrackerRefineByTempCons(void *data_grayim4d, int _data_type, long bufSize[5],
+const QStringList &filelist){
+
+    micTracker.micInitialize(data_grayim4d,_data_type,bufSize);
+    for(size_t i=0;i<(size_t)micTracker.time_points;i++){
+        micTracker.processSingleFrameAndReturn(i,filelist.at(i));
+    }
+
+    // info from micPerFrame (this is deep copy of mat!!)
+
+    cell_label_maps.resize(micTracker.time_points);
+    for(size_t i=0;i<(size_t)micTracker.time_points;i++){
+        micTracker.cell_label_maps[i].copyTo(cell_label_maps[i]);
+    }
+
+    principalCurv3d.resize(micTracker.time_points);
+    for(size_t i=0;i<(size_t)micTracker.time_points;i++){
+        micTracker.principalCurv3d[i].copyTo(principalCurv3d[i]);
+        principalCurv3d[i]/=255;
+    }
+
+    segScore3d.resize(micTracker.time_points);
+    for(size_t i=0;i<(size_t)micTracker.time_points;i++){
+        micTracker.segScore3d[i].copyTo(segScore3d[i]);
+    }
+
+    data_rows_cols_slices=micTracker.data_rows_cols_slices;
+    time_points=micTracker.time_points;
+    micTracker.normalized_data4d.copyTo(normalized_data4d);
+
+    number_cells=micTracker.number_cells;
+    VoxelIdxList=micTracker.VoxelIdxList;
+    avgItstyVec=micTracker.avgItstyVec;
+    for(size_t i=0;i<avgItstyVec.size();i++){
+        for(size_t j=0;j<avgItstyVec[i].size();j++){
+            avgItstyVec[i][j]/=255;
+        }
+    }
+    areaVec=micTracker.areaVec;
+    ctrPt=micTracker.ctrPt;
+    CoordinateRgs=micTracker.CoordinateRgs;
+
+
+    effZinFmTwoEndIdx=Mat::zeros(micTracker.time_points,2,CV_8U);
+    dtctMtScVec.resize(micTracker.time_points);
+
+}
+
+// not used
 MicTrackerRefineByTempCons::MicTrackerRefineByTempCons(MicTrackerMain micPerFrame,
                                                        const QStringList &filelist)
 {
@@ -25,15 +64,27 @@ MicTrackerRefineByTempCons::MicTrackerRefineByTempCons(MicTrackerMain micPerFram
         micPerFrame.processSingleFrameAndReturn(i,filelist.at(i));
     }
 
-    // info from micPerFrame
-    cell_label_maps=micPerFrame.cell_label_maps;
-    principalCurv3d=micPerFrame.principalCurv3d;
-    for(size_t i=0;i<principalCurv3d.size();i++){
+    // info from micPerFrame (this is deep copy of mat!!)
+
+    cell_label_maps.resize(micPerFrame.time_points);
+    for(size_t i=0;i<micPerFrame.time_points;i++){
+        micPerFrame.cell_label_maps[i].copyTo(cell_label_maps[i]);
+    }
+
+    principalCurv3d.resize(micPerFrame.time_points);
+    for(size_t i=0;i<micPerFrame.time_points;i++){
+        micPerFrame.principalCurv3d[i].copyTo(principalCurv3d[i]);
         principalCurv3d[i]/=255;
     }
+
+    segScore3d.resize(micPerFrame.time_points);
+    for(size_t i=0;i<micPerFrame.time_points;i++){
+        micPerFrame.segScore3d[i].copyTo(segScore3d[i]);
+    }
+
     data_rows_cols_slices=micPerFrame.data_rows_cols_slices;
     time_points=micPerFrame.time_points;
-    normalized_data4d=micPerFrame.normalized_data4d;
+    micPerFrame.normalized_data4d.copyTo(normalized_data4d);
 
     number_cells=micPerFrame.number_cells;
     VoxelIdxList=micPerFrame.VoxelIdxList;
@@ -68,21 +119,23 @@ void MicTrackerRefineByTempCons::segRefineByTempCons(){
     fill (numCellResVec_cur.begin(),numCellResVec_cur.end(), nDtct);
     size_t max_detection = *max_element(numCellResVec_cur.begin(), numCellResVec_cur.end());
 
+
     size_t iOutIter=0;
     QTextStream out(stdout);
 
     while((max_detection>1)&&isChanged){
         iOutIter++;
-        out <<"Outer Loop #"<<iOutIter<<"..."<< endl;
+        out <<"Outer Loop #"<<iOutIter<<"..."<< Qt::endl;
         ///////////////////////////////////////////////
         /// estimate cell number of each detection
         /// ///////////////////////////////////////////
+
         tempConsistSort();
 
         ///////////////////////////////////////////////
         /// refine segmentation based on estimation
         /// ///////////////////////////////////////////
-
+        segRefineOperations();
 
     }
 
@@ -104,9 +157,12 @@ void MicTrackerRefineByTempCons::refineInitial(){
 }
 
 void MicTrackerRefineByTempCons::tempConsistSort(){
+
+
     incldRelationship();
 
-
+    minCostSolver.buildGraph((int)nDtct,dtctIncldLst_cur);
+    numCellResVec_cur=minCostSolver.MinCostFlow:: my_min_cost();
 }
 
 void MicTrackerRefineByTempCons::incldRelationship(){
@@ -117,8 +173,6 @@ void MicTrackerRefineByTempCons::incldRelationship(){
     for(size_t t0=0;t0<number_cells_cur.size();t0++){
         for(size_t iSubId0=0;iSubId0<number_cells_cur[t0];iSubId0++){
             // get overall idx
-
-
             if(t0>0){
                 // get pre frame overlapping cell
                 childDtctSet(t0,iSubId0,true);
@@ -153,6 +207,8 @@ void MicTrackerRefineByTempCons::incldRelationshipInitial(){
 
 void MicTrackerRefineByTempCons::childDtctSet(size_t t0,size_t iSubId0,bool flagPre){
 
+
+
     ///////////////////////////////////////////////////////////
     /// initialize
     ///////////////////////////////////////////////////////////
@@ -184,30 +240,46 @@ void MicTrackerRefineByTempCons::childDtctSet(size_t t0,size_t iSubId0,bool flag
     ///////////////////////////////////////////////////////////
     /// find all overlapping cells as candidate
     ///////////////////////////////////////////////////////////
+
+
+
     vector<vector<size_t>> tgtIdxList=VoxelIdxList_cur[t_tgt];
 
     vector<size_t> temp_res;
     vector<size_t> candDtctIds;
     vector<size_t> candDtctVlm;
     vector<size_t> candDtctOvlp;
+
     for(size_t i=0;i<tgtIdxList.size();i++){
-        getCommonElement(iDtct0_vxLst,tgtIdxList[i],temp_res);
+
+        getCommonElementSorted(iDtct0_vxLst,tgtIdxList[i],temp_res);
+
         if(temp_res.size()>0){
             candDtctIds.push_back(i);
             candDtctVlm.push_back(areaVec_cur[t_tgt][i]);
             candDtctOvlp.push_back(temp_res.size());
         }
+
+
+
     }
+
+
     ///////////////////////////////////////////////////////////
     /// iteratively remove poor candidates based on IOU score
     ///////////////////////////////////////////////////////////
+
+
     size_t N=candDtctIds.size();
+    size_t N_remain=N;
     vector<bool> goodCandi(N,true);
     vector<bool> goodCandi_temp(N,true);
     vector<float> tempOvlpScVec(N,0);
     size_t ovlp_sum_temp=0;
     size_t all_sum_temp=0;
     size_t vlm0=iDtct0_vxLst.size();
+
+
 
     // get original IOU
     ovlp_sum_temp=0;
@@ -242,14 +314,16 @@ void MicTrackerRefineByTempCons::childDtctSet(size_t t0,size_t iSubId0,bool flag
             int maxElementIndex = max_element(tempOvlpScVec.begin(),tempOvlpScVec.end()) - tempOvlpScVec.begin();
             float maxElement = *max_element(tempOvlpScVec.begin(), tempOvlpScVec.end());
 
-            if(maxElement>ovlpSc){
+            if((maxElement>ovlpSc)||(N_remain>numCellResVec_cur[iDtct0])){
                 ovlpSc=maxElement;
                 goodCandi[maxElementIndex]=false;
+                N_remain--;
             }else{
                 break;
             }
         }
     }
+
 
     // send result to dtctIncldLst_cur
     for(size_t i=0;i<N;i++){
@@ -260,15 +334,36 @@ void MicTrackerRefineByTempCons::childDtctSet(size_t t0,size_t iSubId0,bool flag
         }
     }
 
+
 }
 
 
 void MicTrackerRefineByTempCons::getCommonElement(vector<size_t> vector1,vector<size_t> vector2,vector<size_t> &result){
 
-    // Sort the vector
+    // Sort the vector (slow, need modification)
     sort(vector1.begin(), vector1.end());
     sort(vector2.begin(), vector2.end());
 
+
+    // Initialise a vector
+    // to store the common values
+    // and an iterator
+    // to traverse this vector
+    vector<size_t> v(vector1.size() + vector2.size());
+    vector<size_t>::iterator it, st;
+
+    it = set_intersection(vector1.begin(),
+                          vector1.end(),
+                          vector2.begin(),
+                          vector2.end(),
+                          v.begin());
+    result.clear();
+    for (st = v.begin(); st != it; ++st){
+        result.push_back(*st);
+    }
+}
+
+void MicTrackerRefineByTempCons::getCommonElementSorted(vector<size_t> &vector1,vector<size_t> &vector2,vector<size_t> &result){
 
     // Initialise a vector
     // to store the common values
@@ -282,9 +377,35 @@ void MicTrackerRefineByTempCons::getCommonElement(vector<size_t> vector1,vector<
                           vector2.begin(),
                           vector2.end(),
                           v.begin());
+
     result.clear();
     for (st = v.begin(); st != it; ++st){
         result.push_back(*st);
+    }
+}
+
+void MicTrackerRefineByTempCons::getCommonElementFast(vector<size_t> vector1,vector<size_t> vector2,vector<size_t> &result){
+
+    // find max element
+    size_t maxElement1 = *max_element(vector1.begin(), vector1.end());
+    size_t maxElement2 = *max_element(vector2.begin(), vector2.end());
+    size_t maxElement=max(maxElement1,maxElement2);
+    size_t minElement1 = *min_element(vector1.begin(), vector1.end());
+    size_t minElement2 = *min_element(vector2.begin(), vector2.end());
+    size_t minElement=min(minElement1,minElement2);
+
+
+    // build map
+    size_t N=maxElement-minElement+1;
+    vector<bool> ref(N,false);
+//    bool ref[N]={false};
+    for(size_t i=0;i<vector1.size();i++){
+        ref[vector1[i]-minElement]=true;
+    }
+    for(size_t i=0;i<vector2.size();i++){
+        if(ref[vector2[i]-minElement]){
+            result.push_back(i);
+        }
     }
 }
 
@@ -339,7 +460,7 @@ void MicTrackerRefineByTempCons::getDtctMtScVec(){
     size_t validSz=0;
     float sumIntensityDiffSQ=0;
 
-    for(size_t tt=0;tt<time_points;tt++){
+    for(size_t tt=0;tt<(size_t)time_points;tt++){
         dtctMtScVec[tt].resize(number_cells[tt]);
         for(size_t cellCnt=0;cellCnt<number_cells[tt];cellCnt++){
             dtctMtScVec[tt][cellCnt].resize(2);
@@ -349,7 +470,7 @@ void MicTrackerRefineByTempCons::getDtctMtScVec(){
 
     // collect data for null and estimate distribution
     vector<float> data4null;
-    for(size_t tt=0;tt<time_points-1;tt++){
+    for(size_t tt=0;tt<(size_t)time_points-1;tt++){
 
         unsigned char *ind = (unsigned char*)normalized_data4d.data+sz_single_frame*tt;
         Mat img1=Mat(3, normalized_data4d.size, CV_8U, ind);
@@ -407,7 +528,7 @@ void MicTrackerRefineByTempCons::getDtctMtScVec(){
 
     // collect data for alt and estimate distribution
     vector<float> data4alt;
-    for(size_t tt=0;tt<time_points;tt++){
+    for(size_t tt=0;tt<(size_t)time_points;tt++){
         for(size_t cellCnt=0;cellCnt<number_cells[tt];cellCnt++){
             data4alt.push_back(avgItstyVec[tt][cellCnt]);
         }
@@ -745,3 +866,118 @@ float MicTrackerRefineByTempCons::stdev ( vector<float> v , float &mean )
     return stdev;
 }
 
+
+void MicTrackerRefineByTempCons::segRefineOperations()
+{
+    micTracker.refineBytemporalInfo_loop2(numCellResVec_cur,dtctIncldLst_cur);
+    updateRefineResult();
+}
+
+void MicTrackerRefineByTempCons::updateRefineResult()
+{
+
+    // info from micPerFrame (this is deep copy of mat!!)
+
+    if(number_cells_cur==micTracker.number_cells){
+        isChanged=false;
+        return;
+    }else{
+        number_cells_cur=micTracker.number_cells;
+    }
+
+
+    cell_label_maps.resize(micTracker.time_points);
+    for(size_t i=0;i<(size_t) micTracker.time_points;i++){
+        micTracker.cell_label_maps[i].copyTo(cell_label_maps[i]);
+    }
+
+    VoxelIdxList_cur=micTracker.VoxelIdxList;
+    avgItstyVec_cur=micTracker.avgItstyVec;
+    for(size_t i=0;i<avgItstyVec_cur.size();i++){
+        for(size_t j=0;j<avgItstyVec_cur[i].size();j++){
+            avgItstyVec_cur[i][j]/=255;
+        }
+    }
+
+    areaVec_cur=micTracker.areaVec;
+    ctrPt_cur=micTracker.ctrPt;
+    CoordinateRgs_cur=micTracker.CoordinateRgs;
+    updateDtctMtScVec();
+}
+
+void MicTrackerRefineByTempCons::updateDtctMtScVec(){
+    long sz_single_frame =
+            data_rows_cols_slices[0]
+            *data_rows_cols_slices[1]
+            *data_rows_cols_slices[2];
+    long sz_single_slice =
+            data_rows_cols_slices[0]
+            *data_rows_cols_slices[1];
+
+    size_t effVxBnd1[2]={0,0};
+    size_t effVxBnd2[2]={0,0};
+    vector<std::size_t> vxVec;
+    size_t validSz=0;
+    float sumIntensityDiffSQ=0;
+
+    for(size_t tt=0;tt<(size_t)time_points;tt++){
+        dtctMtScVec[tt].resize(number_cells_cur[tt]);
+        for(size_t cellCnt=0;cellCnt<number_cells_cur[tt];cellCnt++){
+            dtctMtScVec[tt][cellCnt].resize(2);
+        }
+    }
+
+
+    // collect data for null and estimate distribution
+    for(size_t tt=0;tt<(size_t)time_points-1;tt++){
+
+        unsigned char *ind = (unsigned char*)normalized_data4d.data+sz_single_frame*tt;
+        Mat img1=Mat(3, normalized_data4d.size, CV_8U, ind);
+        ind = (unsigned char*)normalized_data4d.data+sz_single_frame*(tt+1);
+        Mat img2=Mat(3, normalized_data4d.size, CV_8U, ind);
+
+        img1.convertTo(img1,CV_32F);
+        img2.convertTo(img2,CV_32F);
+        img1/=255;
+        img2/=255;
+
+
+        effVxBnd1[0]=(effZinFmTwoEndIdx.at<unsigned char>(tt,0))*sz_single_slice;
+        effVxBnd1[1]=(effZinFmTwoEndIdx.at<unsigned char>(tt,1)+1)*sz_single_slice-1;
+        effVxBnd2[0]=(effZinFmTwoEndIdx.at<unsigned char>(tt+1,0))*sz_single_slice;
+        effVxBnd2[1]=(effZinFmTwoEndIdx.at<unsigned char>(tt+1,1)+1)*sz_single_slice-1;
+
+        for(size_t cellCnt=0;cellCnt<number_cells_cur[tt];cellCnt++){
+            vxVec=VoxelIdxList_cur[tt][cellCnt];
+
+            validSz=0;
+            sumIntensityDiffSQ=0;
+            for(size_t pxlCnt=0;pxlCnt<vxVec.size();pxlCnt++){
+                if(vxVec[pxlCnt]>=effVxBnd1[0]&&vxVec[pxlCnt]<=effVxBnd1[1]){
+                    validSz++;
+                    sumIntensityDiffSQ+=pow(img1.at<float>(vxVec[pxlCnt])-img2.at<float>(vxVec[pxlCnt]),2);
+                }
+            }
+
+            if(validSz*2>vxVec.size()){
+                dtctMtScVec[tt][cellCnt][1]=sqrt((sumIntensityDiffSQ)/validSz);
+            }
+        }
+
+        for(size_t cellCnt=0;cellCnt<number_cells_cur[tt+1];cellCnt++){
+            vxVec=VoxelIdxList_cur[tt+1][cellCnt];
+            validSz=0;
+            for(size_t pxlCnt=0;pxlCnt<vxVec.size();pxlCnt++){
+                if(vxVec[pxlCnt]>=effVxBnd2[0]&&vxVec[pxlCnt]<=effVxBnd2[1]){
+                    validSz++;
+                    sumIntensityDiffSQ+=pow(img1.at<float>(vxVec[pxlCnt])-img2.at<float>(vxVec[pxlCnt]),2);
+                }
+            }
+
+
+            if(validSz*2>vxVec.size()){
+                dtctMtScVec[tt+1][cellCnt][0]=sqrt((sumIntensityDiffSQ)/validSz);
+            }
+        }
+    }
+}

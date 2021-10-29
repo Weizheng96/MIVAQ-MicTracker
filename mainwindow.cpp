@@ -694,12 +694,14 @@ void MainWindow::sendData4MicTracker_function1(){
         QMessageBox::critical(0, "ASSERT", tr("data has not been imported or displayed"));
         return;
     }
-    if(micTracker == nullptr){
-        micTracker = new MicTrackerMain((void *)data4test->image4d->getRawData(),
-                                            data4test->image4d->getDatatype(),
-                                            glWidget_raycast->bufSize);
-    }
+
+
     if(0){
+        if(micTracker == nullptr){
+            micTracker = new MicTrackerMain((void *)data4test->image4d->getRawData(),
+                                                data4test->image4d->getDatatype(),
+                                                glWidget_raycast->bufSize);
+        }
         // detect cells
         micTracker->processSingleFrameAndReturn(glWidget_raycast->curr_timePoint_in_canvas,
                                                 data4test->filelist.at(glWidget_raycast->curr_timePoint_in_canvas));
@@ -717,7 +719,27 @@ void MainWindow::sendData4MicTracker_function1(){
         glWidget_raycast->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, micTracker->data_rows_cols_slices[1],
                 micTracker->data_rows_cols_slices[0], micTracker->data_rows_cols_slices[2], 4);
     }
-    MicTrackerRefineByTempCons micTrackerRefine=MicTrackerRefineByTempCons(*micTracker,data4test->filelist);
+//    MicTrackerRefineByTempCons micTrackerRefine=MicTrackerRefineByTempCons(*micTracker,data4test->filelist);
+    MicTrackerRefineByTempCons micTrackerRefine=MicTrackerRefineByTempCons((void *)data4test->image4d->getRawData(),
+                                                                           data4test->image4d->getDatatype(),
+                                                                           glWidget_raycast->bufSize
+                                                                           ,data4test->filelist);
     micTrackerRefine.paraLearn();
     micTrackerRefine.segRefineByTempCons();
+
+    // display
+    //// display results in canvas
+    micTracker=&micTrackerRefine.micTracker;
+    int i = glWidget_raycast->curr_timePoint_in_canvas;
+    long sz_single_frame = micTracker->data_rows_cols_slices[0]*micTracker->data_rows_cols_slices[1]*
+            micTracker->data_rows_cols_slices[2];
+    unsigned char *ind = (unsigned char*)micTracker->normalized_data4d.data + sz_single_frame*i; // sub-matrix pointer
+    Mat *single_frame = new Mat(3, micTracker->normalized_data4d.size, CV_8U, ind);
+    Mat4b rgb_mat4display;
+    label2rgb3d(micTracker->cell_label_maps[i], *single_frame, rgb_mat4display);
+    glWidget_raycast->setMode("Alpha blending rgba");
+    glWidget_raycast->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, micTracker->data_rows_cols_slices[1],
+            micTracker->data_rows_cols_slices[0], micTracker->data_rows_cols_slices[2], 4);
+    int a=0;
+
 }
