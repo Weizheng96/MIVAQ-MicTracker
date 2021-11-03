@@ -16,7 +16,7 @@
 #include "raycasting/raycastcanvas.h"
 #include "cellsegmentation/cellsegment_main.h"
 #include "celltracking/celltracking_main.h"
-#include "MicTracker_test/mictrackerrefinebytempcons.h"
+//#include "MicTracker_test/mictrackerrefinebytempcons.h"
 
 
 enum widget_type_choice {my_simple_test_type = 0, raycast_type = 1, vaa3d_type = 2};
@@ -111,12 +111,12 @@ public slots:
 // test MicTracker
 public slots:
     // function
-    void sendData4MicTracker_function1();
+//    void sendData4MicTracker_function1();
 public:
     // menu
-    QMenu *micTrackerMenu;
-    QAction *micTracker_test1;
-    MicTrackerMain * micTracker=nullptr;
+//    QMenu *micTrackerMenu;
+//    QAction *micTracker_test1;
+//    MicTrackerMain * micTracker=nullptr;
 
 //end test
 
