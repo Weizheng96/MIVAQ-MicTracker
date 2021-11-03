@@ -105,9 +105,27 @@ MicTrackerRefineByTempCons::MicTrackerRefineByTempCons(MicTrackerMain micPerFram
 
 void MicTrackerRefineByTempCons::paraLearn(){
 
+    QTextStream out(stdout);
+
+    auto t0 = chrono::high_resolution_clock::now();
     checkZStacks();
+    auto t1 = chrono::high_resolution_clock::now();
+    auto dt = 1.e-9 * chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+    out << "checkZStacks used " << dt << " seconds.\n\n" << Qt::endl;
+
+    t0 = chrono::high_resolution_clock::now();
     getDtctMtScVec();
+    t1 = chrono::high_resolution_clock::now();
+    dt = 1.e-9 * chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+    out << "getDtctMtScVec used " << dt << " seconds.\n\n" << Qt::endl;
+
+
+
+    t0 = chrono::high_resolution_clock::now();
     getFeature4linking();
+    t1 = chrono::high_resolution_clock::now();
+    dt = 1.e-9 * chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+    out << "getFeature4linking used " << dt << " seconds.\n\n" << Qt::endl;
 }
 
 void MicTrackerRefineByTempCons::segRefineByTempCons(){
@@ -130,12 +148,21 @@ void MicTrackerRefineByTempCons::segRefineByTempCons(){
         /// estimate cell number of each detection
         /// ///////////////////////////////////////////
 
+        auto t0 = chrono::high_resolution_clock::now();
         tempConsistSort();
+        auto t1 = chrono::high_resolution_clock::now();
+        auto dt = 1.e-9 * chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+        out << "tempConsistSort used " << dt << " seconds.\n\n" << Qt::endl;
 
         ///////////////////////////////////////////////
         /// refine segmentation based on estimation
         /// ///////////////////////////////////////////
+
+        t0 = chrono::high_resolution_clock::now();
         segRefineOperations();
+        t1 = chrono::high_resolution_clock::now();
+        dt = 1.e-9 * chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
+        out << "segRefineOperations used " << dt << " seconds.\n\n" << Qt::endl;
 
     }
 
@@ -670,11 +697,14 @@ void MicTrackerRefineByTempCons::TruncGaussFit(vector<float> x, float &muhat, fl
     float gSig=gradiantTruncSigma(x_trunc,muhat,sigmahat, bd_up, bd_low);
     float thre=1e-5;
 
+    int cnt=0;
     while(abs(gMu)>abs(thre*muhat)||abs(gSig)>thre*sigmahat){
         muhat+=gMu;
         sigmahat+=gSig;
         gMu=gradiantTruncMu(x_trunc,muhat, sigmahat, bd_up, bd_low);
         gSig=gradiantTruncSigma(x_trunc,muhat, sigmahat, bd_up, bd_low);
+        cnt++;
+        if(cnt>10000){break;}
     }
 }
 
@@ -766,7 +796,7 @@ void MicTrackerRefineByTempCons::gamfit(vector<float> x, vector<float> &parmhat)
     float scalex=sumx/x.size();
 
     for(size_t i=0;i<x.size();i++){
-        x[i]=x[i]/scalex;
+        x[i]=(x[i]>0.001?x[i]/scalex:0.001);
         sumSQ+=pow(x[i]-xbar,2);
         sumlogx+=log(x[i]);
     }

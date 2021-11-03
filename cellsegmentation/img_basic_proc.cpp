@@ -3017,6 +3017,11 @@ void colorMapGen(Mat *src, Mat3b &colormap, String colorType){
             v = 80.0 + rand_val * 10;
             HsvToRgb(h,s/100,v/100, r[i], g[i], b[i]);
         }
+
+        random_shuffle(g.begin() + 1, g.end());
+        random_shuffle(r.begin() + 1, r.end());
+        random_shuffle(b.begin() + 1, b.end());
+
         Mat1d cmap(m, 3, double(0.0));
         for (int i = 0; i < m; ++i)
         {

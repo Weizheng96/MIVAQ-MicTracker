@@ -505,7 +505,7 @@ void MicTrackerMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gra
     subVolExtract(&principalCurv3d[curr_frame], CV_32F, seed.eigMap3d, seed.crop_range_yxz);// deep copy
     seed.gap3dMap = seed.eigMap3d > 0;
     subVolExtract(data_grayim3d, CV_8U, seed.volUint8, seed.crop_range_yxz);// deep copy
-    seed.outputIdMap = Mat(seed.idMap.dims, seed.idMap.size, CV_32S, Scalar(0));
+    seed.outputIdMap = Mat(seed.idMap.dims, seed.idMap.size, CV_32S, Scalar(-1));
     subVolExtract(dataPC255Float, CV_32F, seed.scoreMap, seed.crop_range_yxz);
     //ccShowSliceLabelMat(idMap);
     vec_sub2ind(seed.idx_yxz_cropped, vec_Minus(seed.y, seed.crop_range_yxz[0].start),
@@ -526,7 +526,7 @@ void MicTrackerMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gra
 void MicTrackerMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol){
 
 
-    if(true){// for test
+    if(false){// for test
         size_t intensityAll=0;
         size_t sz=0;
         for(size_t i=0;i<seed.volUint8.total();i++){
@@ -552,13 +552,18 @@ void MicTrackerMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         int PCseedNum=connectedComponents3d(&PCseed_valid,PCseed_valid_CC,26);
 
         Mat seed_valid_CC;
-        seed.seedMap.copyTo(seed_valid_CC);
+        seed.seedMap.convertTo(seed_valid_CC,CV_32S);
         seed_valid_CC/=255;
 
         removeSmallCC(PCseed_valid_CC, PCseedNum,p4segVol.min_cell_sz, true);//p4segVol.min_cell_sz,p4segVol.min_seed_size
 
+        vector<vector<int>> seedLst;
+        extractVoxIdxList(&PCseed_valid_CC, seedLst, PCseedNum, false);
 
-    //    minMaxIdx(PCseed_valid_CC, &tmp_min, &tmp_max);
+//        ccShowSliceLabelMat(seed_valid_CC,8);
+//        ccShowSliceLabelMat(PCseed_valid_CC,8);
+
+        // minMaxIdx(PCseed_valid_CC, &tmp_min, &tmp_max);
 
 
         if(PCseedNum<2){
@@ -566,16 +571,31 @@ void MicTrackerMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
             seed_valid_CC.convertTo(seed.outputIdMap,CV_32S);
         }else{
 
-            Mat img4watershed;
-            seed.scoreMap.convertTo(img4watershed,CV_8U);
-            Mat output;
-            PCseed_valid_CC.convertTo(output,CV_32S);
+            int width=seed.crop_range_yxz[1].end-seed.crop_range_yxz[1].start;
+            int height=seed.crop_range_yxz[0].end-seed.crop_range_yxz[0].start;
+            int thick=seed.crop_range_yxz[2].end-seed.crop_range_yxz[2].start;
 
-            Mat in[] = {img4watershed, img4watershed, img4watershed};
-            merge(in, 3, img4watershed);
 
-            watershed(img4watershed, output);
-            output.convertTo(seed.outputIdMap,CV_32S);
+            seed.scoreMap=255-seed.scoreMap;
+            seed.scoreMap.convertTo(seed.scoreMap,CV_8U);
+//            ccShowSlice3Dmat(seed.scoreMap, CV_8U,8);
+
+            seed.outputIdMap=seed.outputIdMap.mul(seed_valid_CC);
+
+            WaterShed_WZ::Watershed3D_WZ(
+                seed.scoreMap,
+                width,
+                height,
+                thick,
+                &seed.outputIdMap,
+                seedLst);
+
+//            ccShowSliceLabelMat(seed.outputIdMap,8);
+
+//            seed.outputIdMap=seed.outputIdMap.mul(seed_valid_CC);
+
+//            ccShowSliceLabelMat(seed.outputIdMap,8);
+
             seed.outCell_num=PCseedNum;
         }
     }
@@ -835,8 +855,9 @@ void MicTrackerMain::refineBytemporalInfo_loop2(vector<size_t> numCellResVec_cur
                     refIdx.push_back(VoxelIdxList[refLocalId[0]][refLocalId[1]]);
                 }
                 // split and update cell_label_maps_cur
+                singleCellSeed seed;
                 refineBytemporalInfo_single(currentLocalId[1]+1,currentIdx,
-                        currentLocalId[0],refIdx,cell_cnt);
+                        currentLocalId[0],refIdx,cell_cnt,seed);
                 // only one direction is valid
                 splitedDetection[ii]=true;
                 break;
@@ -846,11 +867,8 @@ void MicTrackerMain::refineBytemporalInfo_loop2(vector<size_t> numCellResVec_cur
 
     ////////////////
     /// test
-    ccShowSliceLabelMat(cell_label_maps[0],50);
-
-    ////////////////
-    /// test
-    ccShowSliceLabelMat(cell_label_maps_cur[0],50);
+//    ccShowSliceLabelMat(cell_label_maps[0],12);
+//    ccShowSliceLabelMat(cell_label_maps_cur[0],12);
 
     ////////////////////////////////////////////////////////////////////////////////////
     /// 3. update unsplitted detections to cell_label_maps_cur
@@ -868,11 +886,8 @@ void MicTrackerMain::refineBytemporalInfo_loop2(vector<size_t> numCellResVec_cur
 
     ////////////////
     /// test
-    ccShowSliceLabelMat(cell_label_maps[0],50);
-
-    ////////////////
-    /// test
-    ccShowSliceLabelMat(cell_label_maps_cur[0],50);
+//    ccShowSliceLabelMat(cell_label_maps[0],12);
+//    ccShowSliceLabelMat(cell_label_maps_cur[0],12);
 
     ////////////////////////////////////////////////////////////////////////////////////
     /// 4. update detections' infomation
@@ -884,7 +899,7 @@ void MicTrackerMain::refineBytemporalInfo_loop2(vector<size_t> numCellResVec_cur
 
     ////////////////
     /// test
-    ccShowSliceLabelMat(cell_label_maps[0],50);
+    ccShowSliceLabelMat(cell_label_maps[0],12);
 
     long sz_single_frame = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
     for(curr_time_point=0;curr_time_point<time_points;curr_time_point++){
@@ -907,8 +922,12 @@ void MicTrackerMain::fillMat(Mat &dat, vector<size_t> idx, size_t value)
 /// This function is used to split one detection into several based on reference and save the result to "cell_label_maps_cur"
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void MicTrackerMain::refineBytemporalInfo_single(int currentID,vector<size_t> currentIdx, size_t currentFrame,
-                                                    vector<vector<size_t>> refIdx,vector<size_t> &cell_cnt)
+                                                    vector<vector<size_t>> refIdx,vector<size_t> &cell_cnt,
+                                                 singleCellSeed &seed)
 {
+//    singleCellSeed seed;
+    Mat *scMat=&segScore3d[currentFrame];
+    Mat *idMap;
     // if this is first time use this function, intialize "cell_label_maps_cur"
     if(accumulate(cell_cnt.begin(), cell_cnt.end(), 0)==0){
         cell_label_maps_cur.resize(time_points);
@@ -918,15 +937,26 @@ void MicTrackerMain::refineBytemporalInfo_single(int currentID,vector<size_t> cu
     }
 
     // crop the detection and spilit based on the linkage
-    singleCellSeed seed;
-    Mat *scMat=&segScore3d[currentFrame];
-    Mat *idMap;
     idMap=&cell_label_maps[currentFrame];
     cropSeed(currentID,currentIdx,refIdx,scMat,idMap, seed, p4segVol);
 
     // update cell_label_maps_cur
     subVolReplace(cell_label_maps_cur[currentFrame], CV_32S, seed.outputIdMap, seed.crop_range_yxz, cell_cnt[currentFrame]);
     cell_cnt[currentFrame] += seed.outCell_num;
+
+    ////////////////
+    /// test
+//    int z=50;
+//    if(currentFrame==0){
+//        if(seed.crop_range_yxz[2].start<=z){
+//            if(seed.crop_range_yxz[2].end>z){
+//                ccShowSliceLabelMat(cell_label_maps[0],z);
+//                ccShowSliceLabelMat(seed.outputIdMap,z-seed.crop_range_yxz[2].start);
+//                ccShowSliceLabelMat(cell_label_maps_cur[0],z);
+//            }
+//        }
+//    }
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -937,13 +967,23 @@ void MicTrackerMain::refineBytemporalInfo_single(int currentID,vector<size_t> cu
 void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<vector<size_t>> refIdx,
                               Mat *scMat, Mat *idMap, singleCellSeed &seed, segParameter p4segVol)
 {
+    vector<vector<int>> seedLst;
+    seedLst.resize(refIdx.size());
+
+    size_t yc;
+    size_t xc;
+    size_t zc;
+    size_t vxc;
+    Mat mask;
+
+
     seed.id = currentID;
     seed.idx_yxz = currentIdx; // deep copy
     seed.y.resize(currentIdx.size());
     seed.x.resize(currentIdx.size());
     seed.z.resize(currentIdx.size());
     vec_ind2sub(currentIdx, seed.y, seed.x, seed.z, idMap->size);// MatSize itself is a vector
-//    ccShowSliceLabelMat(idMap);
+
     getRange(seed.y, p4segVol.shift_yxz[0], idMap->size[0], seed.crop_range_yxz[0]);
     getRange(seed.x, p4segVol.shift_yxz[1], idMap->size[1], seed.crop_range_yxz[1]);
     getRange(seed.z, p4segVol.shift_yxz[2], idMap->size[2], seed.crop_range_yxz[2]);
@@ -951,13 +991,13 @@ void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<ve
 
     subVolExtract(idMap, CV_32S, seed.idMap, seed.crop_range_yxz);
     seed.seedMap = seed.idMap == seed.id;
-    Mat mask;
+
     seed.seedMap.convertTo(mask,CV_32S);;
     mask=mask/255;
 
 
 
-    seed.outputIdMap = Mat(seed.idMap.dims, seed.idMap.size, CV_32S, Scalar(0));
+    seed.outputIdMap = Mat(seed.idMap.dims, seed.idMap.size, CV_32S, Scalar(-1));
 
     subVolExtract(scMat, CV_32F, seed.scoreMap, seed.crop_range_yxz);
     //ccShowSliceLabelMat(idMap);
@@ -969,30 +1009,23 @@ void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<ve
     ///////////////////////////////////////////////
     /// for referrence cells in the other frame
     ///////////////////////////////////////////////
-    vector<size_t> vxLst;
-    vector<vector<int>> seedLst;
-    seedLst.resize(refIdx.size());
-    vector<int> y;
-    vector<int> x;
-    vector<int> z;
-    size_t yc;
-    size_t xc;
-    size_t zc;
-    size_t vxc;
     seed.otherIdMap=Mat::zeros(seed.idMap.dims,seed.idMap.size,CV_32S);
     bool isMember;
     for(size_t i=0;i<refIdx.size();i++){
-        vxLst=refIdx[i];
-        y.resize(vxLst.size());
-        x.resize(vxLst.size());
-        z.resize(vxLst.size());
-        vec_ind2sub(vxLst, y, x, z, idMap->size);
+//        vector<size_t> vxLst=refIdx[i];
+        vector<int> y;
+        vector<int> x;
+        vector<int> z;
+        y.resize(refIdx[i].size());
+        x.resize(refIdx[i].size());
+        z.resize(refIdx[i].size());
+        vec_ind2sub(refIdx[i], y, x, z, idMap->size);
         yc=avg(y);
         xc=avg(x);
         zc=avg(z);
         vol_sub2ind(vxc, yc, xc, zc, idMap->size);
 
-        isMember=find(currentIdx.begin(), currentIdx.end(), vxc) !=currentIdx.end();
+        isMember=(find(currentIdx.begin(), currentIdx.end(), vxc) !=currentIdx.end());
         if(isMember){
             // if the center of refer is in the detection
             // for method #1
@@ -1002,7 +1035,7 @@ void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<ve
             seedLst[i].push_back(vxc);
         }else{
             // if the center of refer is not in the detection
-            for(size_t j=0;j<vxLst.size();j++){
+            for(size_t j=0;j<refIdx[i].size();j++){
                 // for method #1
                 yc=y[j];
                 xc=x[j];
@@ -1013,6 +1046,10 @@ void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<ve
                 seedLst[i].push_back(vxc);
             }
         }
+        y.clear();
+        x.clear();
+        z.clear();
+
     }
     seed.otherIdMap=seed.otherIdMap.mul(mask);
 
@@ -1025,24 +1062,33 @@ void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<ve
 //    }
 
     // method #1
-    int cost_design[2]={1,1};
 
-    int width=seed.crop_range_yxz[0].end-seed.crop_range_yxz[0].start;
-    int height=seed.crop_range_yxz[1].end-seed.crop_range_yxz[1].start;
+    int width=seed.crop_range_yxz[1].end-seed.crop_range_yxz[1].start;
+    int height=seed.crop_range_yxz[0].end-seed.crop_range_yxz[0].start;
     int thick=seed.crop_range_yxz[2].end-seed.crop_range_yxz[2].start;
 
-    Watershed3D_WZ(
+
+    seed.scoreMap=(1-seed.scoreMap)*255;
+    seed.scoreMap.convertTo(seed.scoreMap,CV_8U);
+
+    seed.outputIdMap=seed.outputIdMap.mul(mask);
+    WaterShed_WZ::Watershed3D_WZ(
         seed.scoreMap,
         width,
         height,
         thick,
-        seed.outputIdMap,
+        &seed.outputIdMap,
         seedLst);
+    seed.outputIdMap=seed.outputIdMap.mul(mask);
+//    mask.convertTo(seed.outputIdMap,CV_32S);
 
-    for(int i=0;i<(seed.crop_range_yxz[2].end-seed.crop_range_yxz[2].start);i++)
-    {
-        ccShowSliceLabelMat(seed.outputIdMap,i);
-    }
+
+//    for(int i=0;i<(seed.crop_range_yxz[2].end-seed.crop_range_yxz[2].start);i++)
+//    {
+//        ccShowSliceLabelMat(seed.outputIdMap,i);
+//    }
+
+//    vxLst.clear();
 
 
 }

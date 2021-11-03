@@ -1,6 +1,5 @@
 #ifndef MICTRACKERMAIN_H
 #define MICTRACKERMAIN_H
-
 #include <opencv2/core.hpp> //basic building blocks of opencv
 #include <opencv2/imgcodecs.hpp> // image io
 #include <opencv2/highgui.hpp> //image display
@@ -8,7 +7,7 @@
 #include "data_importer.h"
 #include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
 #include "mincostflow.h"
-#include "Watershed3D_WZ.h"
+#include "watershed_wz.h"
 #include <string>
 #include <chrono> // time elapsed
 #include <fstream> // for file stream
@@ -16,7 +15,6 @@
 #include <QLabel>
 #include <QWidget>
 #include <QDebug>
-
 
 class MicTrackerMain
 {
@@ -58,9 +56,9 @@ public:
     void loop2_Initialization();
     void refineBytemporalInfo_loop2(vector<size_t> numCellResVec_cur,
                                     vector<vector<vector<size_t> > > dtctIncldLst_cur);
-    void refineBytemporalInfo_single(int currentID,vector<size_t> currentIdx,
-                                     size_t currentFrame,vector<vector<size_t>> refIdx,
-                                     vector<size_t> &cell_cnt);
+    void refineBytemporalInfo_single(int currentID, vector<size_t> currentIdx,
+                                     size_t currentFrame, vector<vector<size_t>> refIdx,
+                                     vector<size_t> &cell_cnt, singleCellSeed &seed);
     void fillMat(Mat &dat, vector<size_t> idx, size_t value);
     void cropSeed(int seed_id, vector<size_t> idx_yxz, vector<vector<size_t>> refIdx,
                   Mat *scMat, Mat *idMap, singleCellSeed &seed, segParameter p4segVol);

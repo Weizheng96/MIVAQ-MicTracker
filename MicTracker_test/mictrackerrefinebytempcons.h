@@ -1,7 +1,5 @@
 #ifndef MICTRACKERREFINEBYTEMPCONS_H
 #define MICTRACKERREFINEBYTEMPCONS_H
-
-
 #include "mictrackermain.h"
 #include "data_importer.h"
 #include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
@@ -12,7 +10,6 @@
 #include <QTextStream>
 #include <QLabel>
 #include <QWidget>
-
 #include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
 #include <string>
 #include <chrono> // time elapsed
@@ -20,8 +17,8 @@
 #include <QTextStream>
 #include <boost/math/special_functions/digamma.hpp>
 #include <boost/math/special_functions/gamma.hpp>
-
 #include <QDebug>
+#include <algorithm>    // std::max
 
 
 

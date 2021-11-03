@@ -14,6 +14,7 @@ SOURCES += data_importer.cpp \
     MicTracker_test/mictrackerrefinebytempcons.cpp \
     MicTracker_test/mincostflow.cpp \
     MicTracker_test/parameter4mictracker.cpp \
+    MicTracker_test/watershed_wz.cpp \
     cellsegmentation/cellsegment_main.cpp \
     cellsegmentation/img_basic_proc.cpp \
     cellsegmentation/maxflow_bk/graph.cpp \
@@ -45,11 +46,11 @@ SOURCES += data_importer.cpp \
     src_3rd/io/io_bioformats.cpp
 
 HEADERS += data_importer.h \
-    MicTracker_test/Watershed3D_WZ.h \
     MicTracker_test/mictrackermain.h \
     MicTracker_test/mictrackerrefinebytempcons.h \
     MicTracker_test/mincostflow.h \
     MicTracker_test/parameter4mictracker.h \
+    MicTracker_test/watershed_wz.h \
     cellsegmentation/cc3d.hpp \
     cellsegmentation/cellsegment_main.h \
     cellsegmentation/img_basic_proc.h \
@@ -112,8 +113,8 @@ HEADERS += data_importer.h \
 #    src_3rd/cellseg/FL_volimgProcLib.h \
 #    src_3rd/cellseg/FL_watershed_vs.h \
 #    src_3rd/cellseg/nrutil.h \
-    src_3rd/io/io_bioformats.h \
-#    src_3rd/v3d/import_images_tool_dialog.h
+    src_3rd/io/io_bioformats.h
+ #    src_3rd/v3d/import_images_tool_dialog.h
 
 #FORMS += v3d/import_images_tool.ui
 

@@ -1,6 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+
 #include <QMainWindow>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -15,7 +16,6 @@
 #include "raycasting/raycastcanvas.h"
 #include "cellsegmentation/cellsegment_main.h"
 #include "celltracking/celltracking_main.h"
-#include "MicTracker_test/mictrackermain.h"
 #include "MicTracker_test/mictrackerrefinebytempcons.h"
 
 
