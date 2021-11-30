@@ -37,9 +37,11 @@ public:
     vector<size_t> my_min_cost();
 
     // for watershed
-    void shortest_paths_floatCost(int n, int v0, vector<float>& d);
-    void mincost_forwaterShed_buildGraph(Mat &scoreMap, vector<size_t> &seedVx,Mat &Mask) ;
-    void mincost_forwaterShed(Mat &scoreMap, vector<vector<size_t>> seedLst,Mat Mask,Mat &resMap);
+//    void shortest_paths_floatCost(int n, int v0, vector<float>& d);
+//    void mincost_forwaterShed_buildGraph(Mat &scoreMap, vector<size_t> &seedVx,Mat &Mask) ;
+//    void mincost_forwaterShed(Mat &scoreMap, vector<vector<size_t>> seedLst,Mat Mask,Mat &resMap);
+
+
 
 public:
     vector<vector<int>> adj, cost, capacity,capacity_org,flowMap;

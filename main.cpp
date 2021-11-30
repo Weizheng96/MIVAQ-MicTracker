@@ -4,6 +4,7 @@
 
 int main(int argc, char *argv[])
 {
+
     QApplication a(argc, argv);
     MainWindow w;
     w.show();
@@ -18,6 +19,8 @@ int main(int argc, char *argv[])
         a.setStyleSheet(ts.readAll());
         //a->setStyleSheet(ts.readAll());
     }
+
+
 
     return a.exec();
 }

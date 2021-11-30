@@ -41,9 +41,9 @@ public:
     void getDtctMtScVec();
     void getFeature4linking();
 
-    float gamfitLkeqn(float a, float cnst);
-    float fzero_gamfitLkeqn(float lower, float upper, float cnst);
-    void gamfit(vector<float> x, vector<float> &parmhat);
+    static float gamfitLkeqn(float a, float cnst);
+    static float fzero_gamfitLkeqn(float lower, float upper, float cnst);
+    static void gamfit(vector<float> x, vector<float> &parmhat);
     void histogram(vector<float> x);
     static void CorrespondingCell(vector<size_t> vxLst,vector<size_t> &candIds,vector<size_t> &ovlpAreas);
     static float avg ( vector<float> v );
@@ -70,7 +70,7 @@ public:
     void childDtctSet(size_t t0,size_t iSubId0,bool flagPre);
 
     static void getCommonElement(vector<size_t> vector1,vector<size_t> vector2,vector<size_t> &result);
-    void getCommonElementSorted(vector<size_t> &vector1, vector<size_t> &vector2, vector<size_t> &result);
+    static void getCommonElementSorted(vector<size_t> &vector1, vector<size_t> &vector2, vector<size_t> &result);
     static void getCommonElementFast(vector<size_t> vector1,vector<size_t> vector2,vector<size_t> &result);
 
     void segRefineOperations();

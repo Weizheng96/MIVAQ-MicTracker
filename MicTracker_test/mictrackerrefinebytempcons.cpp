@@ -23,6 +23,8 @@ const QStringList &filelist){
         micTracker.cell_label_maps[i].copyTo(cell_label_maps[i]);
     }
 
+//    ccShowSliceLabelMat(cell_label_maps[0],12);
+
     principalCurv3d.resize(micTracker.time_points);
     for(size_t i=0;i<(size_t)micTracker.time_points;i++){
         micTracker.principalCurv3d[i].copyTo(principalCurv3d[i]);
@@ -154,6 +156,7 @@ void MicTrackerRefineByTempCons::segRefineByTempCons(){
         auto dt = 1.e-9 * chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
         out << "tempConsistSort used " << dt << " seconds.\n\n" << Qt::endl;
 
+        size_t max_detection = *max_element(numCellResVec_cur.begin(), numCellResVec_cur.end());
         ///////////////////////////////////////////////
         /// refine segmentation based on estimation
         /// ///////////////////////////////////////////
@@ -163,7 +166,6 @@ void MicTrackerRefineByTempCons::segRefineByTempCons(){
         t1 = chrono::high_resolution_clock::now();
         dt = 1.e-9 * chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
         out << "segRefineOperations used " << dt << " seconds.\n\n" << Qt::endl;
-
     }
 
 }
@@ -397,7 +399,7 @@ void MicTrackerRefineByTempCons::getCommonElementSorted(vector<size_t> &vector1,
     // and an iterator
     // to traverse this vector
     vector<size_t> v(vector1.size() + vector2.size());
-    typename vector<size_t>::iterator it, st;
+    vector<size_t>::iterator it, st;
 
     it = set_intersection(vector1.begin(),
                           vector1.end(),

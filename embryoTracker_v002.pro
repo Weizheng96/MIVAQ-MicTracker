@@ -10,10 +10,14 @@ CONFIG += c++17
 #DEFINES += USE_Qt5 # for vaa3d functions
 
 SOURCES += data_importer.cpp \
+    MicTracker_test/auxiliaryparaforlink.cpp \
+    MicTracker_test/mictrackerlinkage.cpp \
     MicTracker_test/mictrackermain.cpp \
     MicTracker_test/mictrackerrefinebytempcons.cpp \
     MicTracker_test/mincostflow.cpp \
+    MicTracker_test/motionparameters.cpp \
     MicTracker_test/parameter4mictracker.cpp \
+    MicTracker_test/shapeparameters.cpp \
     MicTracker_test/watershed_wz.cpp \
     cellsegmentation/cellsegment_main.cpp \
     cellsegmentation/img_basic_proc.cpp \
@@ -46,10 +50,15 @@ SOURCES += data_importer.cpp \
     src_3rd/io/io_bioformats.cpp
 
 HEADERS += data_importer.h \
+    MicTracker_test/NetworkFlowSolver.hpp \
+    MicTracker_test/auxiliaryparaforlink.h \
+    MicTracker_test/mictrackerlinkage.h \
     MicTracker_test/mictrackermain.h \
     MicTracker_test/mictrackerrefinebytempcons.h \
     MicTracker_test/mincostflow.h \
+    MicTracker_test/motionparameters.h \
     MicTracker_test/parameter4mictracker.h \
+    MicTracker_test/shapeparameters.h \
     MicTracker_test/watershed_wz.h \
     cellsegmentation/cc3d.hpp \
     cellsegmentation/cellsegment_main.h \
@@ -121,6 +130,7 @@ HEADERS += data_importer.h \
 
 ## adding include paths and libs related to opencv
 #include(opencv.qrc)
+
 INCLUDEPATH += /usr/local/include/opencv4
 LIBS += -L/usr/local/lib -lopencv_imgproc -lopencv_core -lopencv_highgui -lopencv_imgcodecs
 
@@ -190,3 +200,6 @@ RESOURCES += \
     Pictures/res.qrc \
     qdarkstyle/style.qrc \
     raycasting/resources.qrc
+
+
+

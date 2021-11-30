@@ -64,6 +64,7 @@ MicTrackerMain::MicTrackerMain(void *data_grayim4d, int _data_type, long bufSize
 
 }
 
+
 MicTrackerMain::MicTrackerMain()
 {
 }
@@ -182,6 +183,13 @@ void MicTrackerMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fram
     //////////////////////////////////////////////////////////////////
     Mat *dataVolFloat = new Mat(data_grayim3d->dims, data_grayim3d->size, CV_32F);
     data_grayim3d->convertTo(*dataVolFloat, CV_32F);
+    fgThreshold=getMaxContrast(data_grayim3d)-1;
+    Mat foreground;
+    getForeground(data_grayim3d, foreground);
+    Mat FgMask;
+    foreground.convertTo(FgMask,CV_32S);
+    FgMask/=255;
+
 
     //////////////////////////////////////////////////////////////////
     //           2. get PC score
@@ -196,6 +204,7 @@ void MicTrackerMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fram
     //////////////////////////////////////////////////////////////////
     //           3. use synQuant for PC score
     //////////////////////////////////////////////////////////////////
+
     double tmp_min, tmp_max;
     Mat imgIn_temp, imgIn_temp2;
 
@@ -213,11 +222,12 @@ void MicTrackerMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fram
     imgPCfloat255.convertTo(imgPC8U, CV_8U);
     synQuantSimple seeds_from_synQuant(&imgPC8U, variances[curr_frame], p4segVol, p4odStats);
 
-    fgThreshold=getMaxContrast(data_grayim3d);
-//    Mat foreground;
-//    getForeground(data_grayim3d, foreground);
-//    Mat FgMask;
-//    foreground.convertTo(FgMask,CV_32S);
+    Mat &temp=*seeds_from_synQuant.idMap;
+    temp=seeds_from_synQuant.idMap->mul(FgMask);
+    removeSmallCC(temp,seeds_from_synQuant.cell_num,p4segVol.min_cell_sz, true);//p4segVol.min_cell_sz,p4segVol.min_seed_size
+
+
+
 //    FgMask/=255;
 //    *seeds_from_synQuant.idMap=seeds_from_synQuant.idMap->mul(FgMask);
 //    removeSmallCC(*seeds_from_synQuant.idMap, seeds_from_synQuant.cell_num, p4segVol.min_cell_sz, true);
@@ -253,16 +263,18 @@ void MicTrackerMain::getForeground(Mat * data_grayim3d, Mat &foreground){
             }
         }
     }
+    //
+    foreground=foreGround_median;
 
-    // imopen
-    int elementSize[3]={7,7,7};
-    Mat MatTemp,foreground_open;
-    volumeErode(&foreGround_median, MatTemp, elementSize, MORPH_RECT);
-    volumeDilate(&MatTemp, foreground_open, elementSize, MORPH_RECT);
+//    // imopen
+//    int elementSize[3]={7,7,7};
+//    Mat MatTemp,foreground_open;
+//    volumeErode(&foreGround_median, MatTemp, elementSize, MORPH_RECT);
+//    volumeDilate(&MatTemp, foreground_open, elementSize, MORPH_RECT);
 
-    // imclose
-    volumeDilate(&foreground_open, MatTemp, elementSize, MORPH_RECT);
-    volumeErode(&MatTemp, foreground, elementSize, MORPH_RECT);
+//    // imclose
+//    volumeDilate(&foreground_open, MatTemp, elementSize, MORPH_RECT);
+//    volumeErode(&MatTemp, foreground, elementSize, MORPH_RECT);
 }
 
 int MicTrackerMain::getMaxContrast(Mat *data_grayim3d){
@@ -580,7 +592,7 @@ void MicTrackerMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
             seed.scoreMap.convertTo(seed.scoreMap,CV_8U);
 //            ccShowSlice3Dmat(seed.scoreMap, CV_8U,8);
 
-            seed.outputIdMap=seed.outputIdMap.mul(seed_valid_CC);
+//            seed.outputIdMap=seed.outputIdMap.mul(seed_valid_CC);
 
             WaterShed_WZ::Watershed3D_WZ(
                 seed.scoreMap,
@@ -589,6 +601,8 @@ void MicTrackerMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
                 thick,
                 &seed.outputIdMap,
                 seedLst);
+
+            seed.outputIdMap=seed.outputIdMap.mul(seed_valid_CC);
 
 //            ccShowSliceLabelMat(seed.outputIdMap,8);
 
@@ -899,7 +913,7 @@ void MicTrackerMain::refineBytemporalInfo_loop2(vector<size_t> numCellResVec_cur
 
     ////////////////
     /// test
-    ccShowSliceLabelMat(cell_label_maps[0],12);
+//    ccShowSliceLabelMat(cell_label_maps[0],12);
 
     long sz_single_frame = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
     for(curr_time_point=0;curr_time_point<time_points;curr_time_point++){
@@ -975,6 +989,7 @@ void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<ve
     size_t zc;
     size_t vxc;
     Mat mask;
+    size_t seedSize;
 
 
     seed.id = currentID;
@@ -991,6 +1006,7 @@ void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<ve
 
     subVolExtract(idMap, CV_32S, seed.idMap, seed.crop_range_yxz);
     seed.seedMap = seed.idMap == seed.id;
+    seedSize=seed.idMap.size[0]*seed.idMap.size[1]*seed.idMap.size[2];
 
     seed.seedMap.convertTo(mask,CV_32S);;
     mask=mask/255;
@@ -1042,6 +1058,7 @@ void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<ve
                 zc=z[j];
                 vol_sub2ind(vxc, yc-seed.crop_range_yxz[0].start, xc-seed.crop_range_yxz[1].start,
                         zc-seed.crop_range_yxz[2].start, seed.idMap.size);
+                if(vxc>=seedSize||vxc<0){continue;}
                 seed.otherIdMap.at<int>(vxc)=i+1;
                 seedLst[i].push_back(vxc);
             }
@@ -1071,7 +1088,7 @@ void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<ve
     seed.scoreMap=(1-seed.scoreMap)*255;
     seed.scoreMap.convertTo(seed.scoreMap,CV_8U);
 
-    seed.outputIdMap=seed.outputIdMap.mul(mask);
+//    seed.outputIdMap=seed.outputIdMap.mul(mask);
     WaterShed_WZ::Watershed3D_WZ(
         seed.scoreMap,
         width,
@@ -1080,6 +1097,37 @@ void MicTrackerMain::cropSeed(int currentID, vector<size_t> currentIdx,vector<ve
         &seed.outputIdMap,
         seedLst);
     seed.outputIdMap=seed.outputIdMap.mul(mask);
+
+    // check if this is a valid segmentation
+    size_t minDtctSize=20;
+    float minRatio=0.25;
+    size_t allSize_now=0;
+    size_t allSize_ref=0;
+
+    vector<vector<size_t>> cellLst_temp;
+    extractVoxIdxList(&seed.outputIdMap, cellLst_temp, seed.outCell_num, false);
+
+    for(size_t i=0;i<cellLst_temp.size();++i){
+        allSize_now+=cellLst_temp[i].size();
+        allSize_ref+=refIdx[i].size();
+    }
+    for(size_t i=0;i<cellLst_temp.size();++i){
+        if(cellLst_temp[i].size()<minDtctSize)
+        {
+            seed.outputIdMap=mask;
+            seed.outCell_num=1;
+            break;
+        }
+        float tempRatio=((float)cellLst_temp[i].size()/allSize_now)/((float)refIdx[i].size()/allSize_ref);
+        if(tempRatio<minRatio)
+        {
+            seed.outputIdMap=mask;
+            seed.outCell_num=1;
+            break;
+        }
+    }
+
+
 //    mask.convertTo(seed.outputIdMap,CV_32S);
 
 

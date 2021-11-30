@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <set>
 
+
 #define UNDEFINED (byte)0
 #define NOT_OBJECT (byte)1
 #define OBJECT (byte)2

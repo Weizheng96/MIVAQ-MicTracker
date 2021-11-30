@@ -261,184 +261,184 @@ void MinCostFlow::buildGraph(int N, vector<vector<vector<size_t> > > &dtctIncldL
 }
 
 
-void MinCostFlow:: shortest_paths_floatCost(int n, int v0, vector<float>& d) {
-    d.assign(n, INF);
-    d[v0] = 0;
-    vector<bool> inq(n, false);
-    vector<int> p;
-    queue<int> q;
-    q.push(v0);
-    p.assign(n, -1);
+//void MinCostFlow:: shortest_paths_floatCost(int n, int v0, vector<float>& d) {
+//    d.assign(n, INF);
+//    d[v0] = 0;
+//    vector<bool> inq(n, false);
+//    vector<int> p;
+//    queue<int> q;
+//    q.push(v0);
+//    p.assign(n, -1);
 
-    while (!q.empty()) {
-        int u = q.front();
-        q.pop();
-        inq[u] = false;
-        for (int v : adj[u]) {
-            if (capacity[u][v] > 0 && d[v] > d[u] + cost_f[u][v]) {
-                d[v] = d[u] + cost_f[u][v];
-                p[v] = u;
-                if (!inq[v]) {
-                    inq[v] = true;
-                    q.push(v);
-                }
-            }
-        }
-    }
-}
+//    while (!q.empty()) {
+//        int u = q.front();
+//        q.pop();
+//        inq[u] = false;
+//        for (int v : adj[u]) {
+//            if (capacity[u][v] > 0 && d[v] > d[u] + cost_f[u][v]) {
+//                d[v] = d[u] + cost_f[u][v];
+//                p[v] = u;
+//                if (!inq[v]) {
+//                    inq[v] = true;
+//                    q.push(v);
+//                }
+//            }
+//        }
+//    }
+//}
 
-void MinCostFlow:: mincost_forwaterShed_buildGraph(Mat &scoreMap, vector<size_t> &seedVx,Mat &Mask) {
+//void MinCostFlow:: mincost_forwaterShed_buildGraph(Mat &scoreMap, vector<size_t> &seedVx,Mat &Mask) {
 
-    const float MINCOST=0.0000001;
+//    const float MINCOST=0.0000001;
 
-    size_t sz_y=scoreMap.size.p[0];
-    size_t sz_x=scoreMap.size.p[1];
-    size_t sz_z=scoreMap.size.p[2];
-    size_t sz_slice=sz_y*sz_x;
-    int N=sz_slice*sz_z;
-    size_t n;
-    size_t n2;
-    float c;
+//    size_t sz_y=scoreMap.size.p[0];
+//    size_t sz_x=scoreMap.size.p[1];
+//    size_t sz_z=scoreMap.size.p[2];
+//    size_t sz_slice=sz_y*sz_x;
+//    int N=sz_slice*sz_z;
+//    size_t n;
+//    size_t n2;
+//    float c;
 
-    adj.clear();
-    cost_f.clear();
-    capacity.clear();
+//    adj.clear();
+//    cost_f.clear();
+//    capacity.clear();
 
-    adj.assign(N, vector<int>());
-    cost_f.assign(N, vector<float>(N, 0));
-    capacity.assign(N, vector<int>(N, 0));
+//    adj.assign(N, vector<int>());
+//    cost_f.assign(N, vector<float>(N, 0));
+//    capacity.assign(N, vector<int>(N, 0));
 
-//    vol_sub2ind(vxc, yc, xc, zc, idMap->size);
-    for(size_t z=0;z<sz_z;z++){
-        for(size_t y=0;y<sz_y;y++){
-            for(size_t x=0;x<sz_x;x++){
-                vol_sub2ind(n, y, x, z, scoreMap.size);
-                if(x>0){
-                    vol_sub2ind(n2, y, x-1, z, scoreMap.size);
-                    if(Mask.at<int>(n2)>0){
-                        adj[n].push_back(n2);
-                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
-                        cost_f[n][n2] = max(c,MINCOST);
-                        capacity[n][n2] = 1;
-                    }
-                }
-                if(x<sz_x-1){
-                    vol_sub2ind(n2, y, x+1, z, scoreMap.size);
-                    if(Mask.at<int>(n2)>0){
-                        adj[n].push_back(n2);
-                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
-                        cost_f[n][n2] = max(c,MINCOST);
-                        capacity[n][n2] = 1;
-                    }
-                }
-                if(y>0){
-                    vol_sub2ind(n2, y-1, x, z, scoreMap.size);
-                    if(Mask.at<int>(n2)>0){
-                        adj[n].push_back(n2);
-                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
-                        cost_f[n][n2] = max(c,MINCOST);
-                        capacity[n][n2] = 1;
-                    }
-                }
-                if(y<sz_y-1){
-                    vol_sub2ind(n2, y+1, x, z, scoreMap.size);
-                    if(Mask.at<int>(n2)>0){
-                        adj[n].push_back(n2);
-                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
-                        cost_f[n][n2] = max(c,MINCOST);
-                        capacity[n][n2] = 1;
-                    }
-                }
-                if(z>0){
-                    vol_sub2ind(n2, y, x, z-1, scoreMap.size);
-                    if(Mask.at<int>(n2)>0){
-                        adj[n].push_back(n2);
-                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
-                        cost_f[n][n2] = max(c,MINCOST);
-                        capacity[n][n2] = 1;
-                    }
-                }
-                if(z<sz_z-1){
-                    vol_sub2ind(n2, y, x, z+1, scoreMap.size);
-                    if(Mask.at<int>(n2)>0){
-                        adj[n].push_back(n2);
-                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
-                        cost_f[n][n2] = max(c,MINCOST);
-                        capacity[n][n2] = 1;
-                    }
-                }
-            }
-        }
-    }
-    size_t id;
-    for(size_t i=0;i<seedVx.size();i++){
-        id=seedVx[i];
-        for(size_t j=0;j<(size_t)N;j++){
-            if(capacity[j][id]>MINCOST){
-                capacity[j][id]=MINCOST;
-            }
-        }
-    }
-
-}
-
-void MinCostFlow::mincost_forwaterShed(Mat &scoreMap, vector<vector<size_t>> seedLst,Mat Mask,Mat &resMap){
-
-    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
-
-    size_t sz_y=scoreMap.size.p[0];
-    size_t sz_x=scoreMap.size.p[1];
-    size_t sz_z=scoreMap.size.p[2];
-    size_t sz_slice=sz_y*sz_x;
-    int N=sz_slice*sz_z;
-    int SeedN=seedLst.size();
-
-//    const float BoundaryValue=-10000;
-//    for(size_t i=0;i<N;i++){
-//        if(Mask.at<int>(i)==0){
-//            scoreMap.at<float>(i)=BoundaryValue;
+////    vol_sub2ind(vxc, yc, xc, zc, idMap->size);
+//    for(size_t z=0;z<sz_z;z++){
+//        for(size_t y=0;y<sz_y;y++){
+//            for(size_t x=0;x<sz_x;x++){
+//                vol_sub2ind(n, y, x, z, scoreMap.size);
+//                if(x>0){
+//                    vol_sub2ind(n2, y, x-1, z, scoreMap.size);
+//                    if(Mask.at<int>(n2)>0){
+//                        adj[n].push_back(n2);
+//                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
+//                        cost_f[n][n2] = max(c,MINCOST);
+//                        capacity[n][n2] = 1;
+//                    }
+//                }
+//                if(x<sz_x-1){
+//                    vol_sub2ind(n2, y, x+1, z, scoreMap.size);
+//                    if(Mask.at<int>(n2)>0){
+//                        adj[n].push_back(n2);
+//                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
+//                        cost_f[n][n2] = max(c,MINCOST);
+//                        capacity[n][n2] = 1;
+//                    }
+//                }
+//                if(y>0){
+//                    vol_sub2ind(n2, y-1, x, z, scoreMap.size);
+//                    if(Mask.at<int>(n2)>0){
+//                        adj[n].push_back(n2);
+//                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
+//                        cost_f[n][n2] = max(c,MINCOST);
+//                        capacity[n][n2] = 1;
+//                    }
+//                }
+//                if(y<sz_y-1){
+//                    vol_sub2ind(n2, y+1, x, z, scoreMap.size);
+//                    if(Mask.at<int>(n2)>0){
+//                        adj[n].push_back(n2);
+//                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
+//                        cost_f[n][n2] = max(c,MINCOST);
+//                        capacity[n][n2] = 1;
+//                    }
+//                }
+//                if(z>0){
+//                    vol_sub2ind(n2, y, x, z-1, scoreMap.size);
+//                    if(Mask.at<int>(n2)>0){
+//                        adj[n].push_back(n2);
+//                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
+//                        cost_f[n][n2] = max(c,MINCOST);
+//                        capacity[n][n2] = 1;
+//                    }
+//                }
+//                if(z<sz_z-1){
+//                    vol_sub2ind(n2, y, x, z+1, scoreMap.size);
+//                    if(Mask.at<int>(n2)>0){
+//                        adj[n].push_back(n2);
+//                        c=scoreMap.at<float>(n)-scoreMap.at<float>(n2);
+//                        cost_f[n][n2] = max(c,MINCOST);
+//                        capacity[n][n2] = 1;
+//                    }
+//                }
+//            }
+//        }
+//    }
+//    size_t id;
+//    for(size_t i=0;i<seedVx.size();i++){
+//        id=seedVx[i];
+//        for(size_t j=0;j<(size_t)N;j++){
+//            if(capacity[j][id]>MINCOST){
+//                capacity[j][id]=MINCOST;
+//            }
 //        }
 //    }
 
-    vector<size_t> sLst;
-    vector<size_t> seedVx;
-    for(size_t i=0;i<(size_t)SeedN;i++){
-        for(size_t j=0;j<seedLst[i].size();j++){
-            if(j==0){
-                sLst.push_back(seedLst[i][j]); // use the first voxel as source
-            }
-            seedVx.push_back(seedLst[i][j]); // all the seed voxels
-        }
-    }
+//}
 
-    // 1. build graph
+//void MinCostFlow::mincost_forwaterShed(Mat &scoreMap, vector<vector<size_t>> seedLst,Mat Mask,Mat &resMap){
 
-    mincost_forwaterShed_buildGraph(scoreMap,seedVx,Mask);
+//    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
 
-    // 2. min cost
-    vector<vector<float>> d;
-    d.resize(sLst.size());
-    for(size_t i=0;i<d.size();i++){
-        shortest_paths_floatCost(N,sLst[i],d[i]);
-    }
+//    size_t sz_y=scoreMap.size.p[0];
+//    size_t sz_x=scoreMap.size.p[1];
+//    size_t sz_z=scoreMap.size.p[2];
+//    size_t sz_slice=sz_y*sz_x;
+//    int N=sz_slice*sz_z;
+//    int SeedN=seedLst.size();
+
+////    const float BoundaryValue=-10000;
+////    for(size_t i=0;i<N;i++){
+////        if(Mask.at<int>(i)==0){
+////            scoreMap.at<float>(i)=BoundaryValue;
+////        }
+////    }
+
+//    vector<size_t> sLst;
+//    vector<size_t> seedVx;
+//    for(size_t i=0;i<(size_t)SeedN;i++){
+//        for(size_t j=0;j<seedLst[i].size();j++){
+//            if(j==0){
+//                sLst.push_back(seedLst[i][j]); // use the first voxel as source
+//            }
+//            seedVx.push_back(seedLst[i][j]); // all the seed voxels
+//        }
+//    }
+
+//    // 1. build graph
+
+//    mincost_forwaterShed_buildGraph(scoreMap,seedVx,Mask);
+
+//    // 2. min cost
+//    vector<vector<float>> d;
+//    d.resize(sLst.size());
+//    for(size_t i=0;i<d.size();i++){
+//        shortest_paths_floatCost(N,sLst[i],d[i]);
+//    }
 
 
-    // 3. give watershed result
-    resMap=Mat(scoreMap.dims, scoreMap.size, CV_32S, Scalar(0));
-    float minSc;
+//    // 3. give watershed result
+//    resMap=Mat(scoreMap.dims, scoreMap.size, CV_32S, Scalar(0));
+//    float minSc;
 
-    for(size_t i=0;i<(size_t)N;i++){
-        minSc=INF;
-        for(size_t j=0;j<sLst.size();j++){
-            if(d[j][i]<minSc){
-                minSc=d[j][i];
-                resMap.at<int>(i)=j+1;
-            }
-        }
-    }
+//    for(size_t i=0;i<(size_t)N;i++){
+//        minSc=INF;
+//        for(size_t j=0;j<sLst.size();j++){
+//            if(d[j][i]<minSc){
+//                minSc=d[j][i];
+//                resMap.at<int>(i)=j+1;
+//            }
+//        }
+//    }
 
-    chrono::steady_clock::time_point end = chrono::steady_clock::now();
-    qInfo("---------------- watershed time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
+//    chrono::steady_clock::time_point end = chrono::steady_clock::now();
+//    qInfo("---------------- watershed time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
 
 
-}
+//}

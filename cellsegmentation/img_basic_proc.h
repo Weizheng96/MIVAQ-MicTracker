@@ -318,6 +318,35 @@ template <typename T> double gammacdf(T x, T a, T b, bool upper){
     if (upper) return 1 - boost::math::gamma_p((double)a, (double)x / b);
     else return boost::math::gamma_p((double)a, (double)x/b);
 }
+
+template <typename T> T exppdf(T x, T mu)
+{
+    T z=x/mu;
+    T y=exp(-z)/mu;
+    return y;
+}
+
+template <typename T> T expcdf(T x, T mu, bool upper)
+{
+    T z=x/mu;
+    if(z<0){z=0;}
+    T p=(upper?exp(-z):-(expm1(-z)));
+    return p;
+}
+
+template <typename T> T gammapdf(T x, T a, T b){
+    //double k = a;
+    //double theta = 1/b;
+    if (x<=0)
+    {
+        return 0;
+    }
+    else
+    {
+        return boost::math::gamma_p_derivative(a,x/b);
+    }
+}
+
 // a super quick way for gamma fitting; reference: https://tminka.github.io/papers/minka-gamma.pdf
 template <typename T> void gammafit(vector<T> const & data, T &a, T &b){
     T mean_val = vec_mean(data);

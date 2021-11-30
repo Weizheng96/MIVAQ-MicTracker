@@ -21,6 +21,14 @@ array<GVInt32, 6> WaterShed_WZ::getNeighbor_WZ(const GVInt32 idx, const GVInt32 
     nIndex[4] = (z == 0) ? -1 : (idx - SLICE);
     nIndex[5] = ((z + 1) == thick) ? -1 : (idx + SLICE);
 
+    //debug
+//    GVInt32 SZ = SLICE*thick;
+//    for(int i=0;i<6;i++){
+//        if(nIndex[i]<-1||nIndex[i]>=SZ){
+//            qDebug()<<"SZ="<<SZ<<", nIndex[i]="<<nIndex[i]<<Qt::endl;
+//        }
+//    }
+
     return nIndex;
 }
 
@@ -298,7 +306,7 @@ void WaterShed_WZ::Watershed3D_WZ(
     toSearchList.resize(markerNum);
 
     // set label to INIT (unsearched)
-//    ::memset(label, -1, sizeof(GVInt32) * SZ);
+//    ::memset(L->data(), -1, sizeof(GVInt32) * SZ);
 
     // initialize
     array<GVInt32, 6> nIdx;

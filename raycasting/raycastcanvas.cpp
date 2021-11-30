@@ -1136,7 +1136,28 @@ void RayCastCanvas::draw_traces(){
         //QColor c = QColor(255,0,0);
         //painter.setPen(QPen(c, 3));
         //        qDebug() << c;
-        if(trace.size() > 1 || (trace.size()==1 && curr_timePoint_in_canvas==0)){
+//        if(trace.size() > 1 || (trace.size()==1 && curr_timePoint_in_canvas==0)){
+//            QVector3D trace_head = volume_pixel_pos_to_view_pos(trace[0]);
+//            trace_head = m_modelViewProjectionMatrix * trace_head;
+//            this->drawPoint(&painter, c, QPointF(trace_head.x(), trace_head.y()), line_width+1);
+//        }
+//        for(int i=1; i<trace.size(); i++){
+//            QVector3D start_p = volume_pixel_pos_to_view_pos(trace[i-1]);
+//            QVector3D end_p = volume_pixel_pos_to_view_pos(trace[i]);
+//            //qDebug() << trace[i-1] << trace[i];
+//            //qDebug() << start_p << end_p;
+//            QVector3D p_start = m_modelViewProjectionMatrix * start_p;
+//            QVector3D p_end = m_modelViewProjectionMatrix * end_p;
+
+//            //qDebug() << p_start << p_end;
+//            //this->drawText(&painter, c, QPointF(p_start.x(), p_start.y()), "x");
+//            //this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "o");
+//            this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()), line_width);
+//            //painter.drawLine(QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));            //flag = true;
+//            //break;
+//            this->drawPoint(&painter, c, QPointF(p_end.x(), p_end.y()), line_width+1);
+//        }
+        if(true){
             QVector3D trace_head = volume_pixel_pos_to_view_pos(trace[0]);
             trace_head = m_modelViewProjectionMatrix * trace_head;
             this->drawPoint(&painter, c, QPointF(trace_head.x(), trace_head.y()), line_width+1);
@@ -1160,4 +1181,28 @@ void RayCastCanvas::draw_traces(){
         //if(flag) break;
     }
     painter.end();
+}
+
+
+// MicTracker
+void RayCastCanvas::import_traces_MicTracker(int t,vector<vector<QVector4D>> &micTraces){
+    // import trace
+    traces.clear();
+    traces.resize(micTraces.size());
+    curr_timePoint_in_canvas = t;
+
+    for(size_t i=0; i<micTraces.size(); ++i){
+        for(size_t j=0;j<micTraces[i].size();++j)
+        {
+            if(micTraces[i][j][0]>t)
+            {
+                break;
+            }
+            else
+            {
+                traces[i].push_back(QVector3D(micTraces[i][j][1],micTraces[i][j][2],micTraces[i][j][3]));
+            }
+        }
+    }
+
 }

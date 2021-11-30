@@ -262,4 +262,8 @@ public:
     //    void setBoundingBoxSpace(BoundingBox BB);
     //    virtual void getBoundingBox(BoundingBox& bb) {bb = boundingBox;};
     //    virtual void drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth=1, float AlineWidth=3);
+
+    // for mictracker
+public:
+    void import_traces_MicTracker(int t,vector<vector<QVector4D>> &micTraces);
 };
